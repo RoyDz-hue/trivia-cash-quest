@@ -1,5 +1,4 @@
-
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Layout from '@/components/Layout';
 import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -10,20 +9,22 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { useNavigate } from 'react-router-dom';
 import { BarChart, Users, Award, Settings, Send, Plus, Database, XCircle } from 'lucide-react';
-import { Category } from '@/types';
+import { Category, Question } from '@/types';
 import { toast } from 'sonner';
+import { GenerateQuestionParams } from '@/services/deepInfraService';
 
 const Admin = () => {
-  const { user, isAdmin } = useAuth();
+  const { user, isAdmin, deepInfraService } = useAuth();
   const navigate = useNavigate();
   const [generateQuestionPrompt, setGenerateQuestionPrompt] = useState('Generate a multiple-choice trivia question about finance with 4 answer options, one correct and three misleading but realistic.');
   const [generatedQuestion, setGeneratedQuestion] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
   const [apiKey, setApiKey] = useState('');
   const [payHeroKey, setPayHeroKey] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState('Finance');
 
   // Redirect if not admin
-  React.useEffect(() => {
+  useEffect(() => {
     if (!isAdmin) {
       navigate('/dashboard');
       toast.error('You do not have permission to access the admin dashboard');
@@ -66,14 +67,34 @@ const Admin = () => {
     { id: '4', username: 'user4', email: 'user4@example.com', phoneNumber: '+254700000004', status: 'active' },
   ];
 
-  const handleGenerateQuestion = () => {
+  const handleGenerateQuestion = async () => {
+    if (!deepInfraService) {
+      toast.error('DeepInfra service is not initialized');
+      return;
+    }
+
     setIsGenerating(true);
-    // Mock API call to DeepInfra
-    setTimeout(() => {
-      setGeneratedQuestion("Which cryptocurrency was the first to implement smart contracts?\nA) Bitcoin\nB) Ethereum\nC) Ripple\nD) Litecoin\n\nCorrect Answer: B) Ethereum");
+    try {
+      const params: GenerateQuestionParams = {
+        category: selectedCategory,
+        difficulty: 'medium',
+      };
+
+      const question = await deepInfraService.generateTrivaQuestion(params);
+      
+      if (question) {
+        const formattedQuestion = `Question: ${question.question}\n\nA) ${question.options[0]}\nB) ${question.options[1]}\nC) ${question.options[2]}\nD) ${question.options[3]}\n\nCorrect Answer: ${['A', 'B', 'C', 'D'][question.correctAnswer]}`;
+        setGeneratedQuestion(formattedQuestion);
+        toast.success('Question generated successfully!');
+      } else {
+        toast.error('Failed to generate a properly formatted question');
+      }
+    } catch (error) {
+      console.error('Error generating question:', error);
+      toast.error('Failed to generate question. Please try again.');
+    } finally {
       setIsGenerating(false);
-      toast.success('Question generated successfully!');
-    }, 1500);
+    }
   };
 
   const saveApiKeys = () => {
@@ -191,14 +212,19 @@ const Admin = () => {
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="prompt">Prompt</Label>
-                <Textarea 
-                  id="prompt" 
-                  value={generateQuestionPrompt}
-                  onChange={(e) => setGenerateQuestionPrompt(e.target.value)}
-                  placeholder="Enter your prompt for question generation"
-                  rows={3}
-                />
+                <Label htmlFor="category">Category</Label>
+                <select 
+                  id="category"
+                  className="w-full px-3 py-2 border rounded-md"
+                  value={selectedCategory}
+                  onChange={(e) => setSelectedCategory(e.target.value)}
+                >
+                  {categories.map(category => (
+                    <option key={category.id} value={category.name}>
+                      {category.name} {category.icon}
+                    </option>
+                  ))}
+                </select>
               </div>
               
               <Button 
@@ -386,7 +412,10 @@ const Admin = () => {
                           variant="outline" 
                           size="sm" 
                           className="flex-1 flex items-center justify-center gap-1"
-                          onClick={handleGenerateQuestion}
+                          onClick={() => {
+                            setSelectedCategory(category.name);
+                            handleGenerateQuestion();
+                          }}
                         >
                           <Database size={14} />
                           <span>Generate Questions</span>
@@ -416,7 +445,7 @@ const Admin = () => {
                   type="password"
                   value={apiKey}
                   onChange={(e) => setApiKey(e.target.value)}
-                  placeholder="Enter your DeepInfra API key"
+                  placeholder="3ZJE3fsTlDv1pLKVtfdNQbRPvwhmfHfF"
                 />
               </div>
               

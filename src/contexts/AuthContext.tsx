@@ -1,6 +1,7 @@
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { User } from '@/types';
+import { createDeepInfraService, DeepInfraService } from '@/services/deepInfraService';
 
 interface AuthContextType {
   user: User | null;
@@ -9,13 +10,28 @@ interface AuthContextType {
   register: (user: Omit<User, 'id' | 'isAdmin'>, password: string) => Promise<void>;
   logout: () => void;
   isAdmin: boolean;
+  deepInfraService: DeepInfraService | null;
+  setDeepInfraApiKey: (apiKey: string) => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+// The DeepInfra API key
+// Note: In a production environment, this should be stored in a secure backend service
+const DEEPINFRA_API_KEY = "3ZJE3fsTlDv1pLKVtfdNQbRPvwhmfHfF";
+
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [deepInfraApiKey, setDeepInfraApiKey] = useState<string>(DEEPINFRA_API_KEY);
+  const [deepInfraService, setDeepInfraService] = useState<DeepInfraService | null>(null);
+
+  useEffect(() => {
+    // Initialize DeepInfra service with API key
+    if (deepInfraApiKey) {
+      setDeepInfraService(createDeepInfraService(deepInfraApiKey));
+    }
+  }, [deepInfraApiKey]);
 
   useEffect(() => {
     // Check local storage for user data on initial load
@@ -36,7 +52,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         username: email.split('@')[0],
         email,
         phoneNumber: '+254700000000',
-        isAdmin: email.includes('admin')
+        isAdmin: email === 'cyntoremix@gmail.com' || email.includes('admin')
       };
       setUser(mockUser);
       localStorage.setItem('triviaUser', JSON.stringify(mockUser));
@@ -56,7 +72,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       const mockUser = {
         id: Math.random().toString(36).substring(2, 9),
         ...userData,
-        isAdmin: false
+        isAdmin: userData.email === 'cyntoremix@gmail.com' || userData.email.includes('admin')
       };
       setUser(mockUser);
       localStorage.setItem('triviaUser', JSON.stringify(mockUser));
@@ -80,7 +96,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       login, 
       register, 
       logout,
-      isAdmin: user?.isAdmin || false
+      isAdmin: user?.isAdmin || false,
+      deepInfraService,
+      setDeepInfraApiKey: (apiKey: string) => setDeepInfraApiKey(apiKey)
     }}>
       {children}
     </AuthContext.Provider>
