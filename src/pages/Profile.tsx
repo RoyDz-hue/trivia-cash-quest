@@ -7,13 +7,17 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { User, Wallet, History, Share2 } from 'lucide-react';
+import { User, Wallet, History, Share2, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
+import { paymentService } from '@/services/paymentService';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 const Profile = () => {
   const { user } = useAuth();
   const [amount, setAmount] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [pendingTransaction, setPendingTransaction] = useState<string | null>(null);
+  const [depositError, setDepositError] = useState<string | null>(null);
 
   // Transaction history mock data
   const transactions = [
@@ -50,20 +54,58 @@ const Profile = () => {
     }, 1500);
   };
 
-  const handleDeposit = () => {
+  const handleDeposit = async () => {
+    setDepositError(null);
+    
     if (!amount || isNaN(parseFloat(amount)) || parseFloat(amount) < 20) {
       toast.error('Please enter a valid amount (minimum Ksh. 20)');
       return;
     }
     
+    if (!user?.phoneNumber) {
+      toast.error('Phone number not found. Please update your profile.');
+      return;
+    }
+    
     setIsLoading(true);
     
-    // Simulate API call
-    setTimeout(() => {
-      toast.success(`Deposit of Ksh. ${amount} has been initiated. Check your phone for STK push.`);
-      setAmount('');
+    try {
+      const response = await paymentService.initiateSTKPush(parseFloat(amount), user.phoneNumber);
+      
+      if (response.success && response.data) {
+        toast.success('STK push initiated. Please check your phone to complete the transaction.');
+        setPendingTransaction(response.data.reference);
+        
+        // Start polling for status updates
+        const checkInterval = setInterval(async () => {
+          try {
+            const status = await paymentService.checkTransactionStatus(response.data!.reference);
+            
+            if (status === 'SUCCESS') {
+              clearInterval(checkInterval);
+              setPendingTransaction(null);
+              toast.success(`Deposit of Ksh. ${amount} successful!`);
+              setAmount('');
+            } else if (['failed', 'cancelled'].includes(status)) {
+              clearInterval(checkInterval);
+              setPendingTransaction(null);
+              toast.error(`Transaction ${status}. Please try again.`);
+            }
+          } catch (error) {
+            console.error('Status check error:', error);
+          }
+        }, 5000);
+      } else {
+        setDepositError(response.error || 'Failed to initiate payment');
+        toast.error(response.error || 'Failed to initiate payment');
+      }
+    } catch (error) {
+      console.error('Deposit error:', error);
+      setDepositError(error instanceof Error ? error.message : 'Unknown error occurred');
+      toast.error('Failed to process payment. Please try again.');
+    } finally {
       setIsLoading(false);
-    }, 1500);
+    }
   };
 
   const copyReferralLink = () => {
@@ -146,6 +188,23 @@ const Profile = () => {
                     </div>
                   </div>
                   
+                  {pendingTransaction && (
+                    <Alert className="bg-yellow-50 border-yellow-200">
+                      <AlertTitle className="text-yellow-800">Transaction in Progress</AlertTitle>
+                      <AlertDescription className="text-yellow-700">
+                        Please check your phone and complete the M-Pesa payment. 
+                        This status will update automatically.
+                      </AlertDescription>
+                    </Alert>
+                  )}
+                  
+                  {depositError && (
+                    <Alert variant="destructive">
+                      <AlertTitle>Payment Error</AlertTitle>
+                      <AlertDescription>{depositError}</AlertDescription>
+                    </Alert>
+                  )}
+                  
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <Card>
                       <CardHeader className="pb-2">
@@ -161,14 +220,16 @@ const Profile = () => {
                             placeholder="Min: Ksh. 20" 
                             value={amount}
                             onChange={(e) => setAmount(e.target.value)}
+                            disabled={isLoading || !!pendingTransaction}
                           />
                         </div>
                         <Button 
                           className="w-full bg-trivia-primary hover:bg-trivia-primary/90"
                           onClick={handleDeposit}
-                          disabled={isLoading}
+                          disabled={isLoading || !!pendingTransaction}
                         >
-                          Deposit via M-Pesa
+                          {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                          {pendingTransaction ? 'Processing...' : 'Deposit via M-Pesa'}
                         </Button>
                       </CardContent>
                     </Card>
@@ -187,6 +248,7 @@ const Profile = () => {
                             placeholder="Min: Ksh. 50" 
                             value={amount}
                             onChange={(e) => setAmount(e.target.value)}
+                            disabled={isLoading}
                           />
                         </div>
                         <Button 
@@ -194,6 +256,7 @@ const Profile = () => {
                           onClick={handleWithdraw}
                           disabled={isLoading}
                         >
+                          {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                           Withdraw to M-Pesa
                         </Button>
                       </CardContent>

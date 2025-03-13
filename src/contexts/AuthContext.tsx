@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { User } from '@/types';
 import { createDeepInfraService, DeepInfraService } from '@/services/deepInfraService';
@@ -12,6 +11,7 @@ interface AuthContextType {
   isAdmin: boolean;
   deepInfraService: DeepInfraService | null;
   setDeepInfraApiKey: (apiKey: string) => void;
+  deepInfraApiKey: string;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -98,7 +98,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       logout,
       isAdmin: user?.isAdmin || false,
       deepInfraService,
-      setDeepInfraApiKey: (apiKey: string) => setDeepInfraApiKey(apiKey)
+      setDeepInfraApiKey: (apiKey: string) => setDeepInfraApiKey(apiKey),
+      deepInfraApiKey
     }}>
       {children}
     </AuthContext.Provider>
