@@ -1,5 +1,4 @@
-
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Layout from '@/components/Layout';
 import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -9,17 +8,24 @@ import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { User, Wallet, History, Share2, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
-import { paymentService } from '@/services/paymentService';
+import { paymentService, TransactionStatus } from '@/services/paymentService';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 const Profile = () => {
   const { user } = useAuth();
-  const [amount, setAmount] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
+  const [depositAmount, setDepositAmount] = useState('');
+  const [withdrawAmount, setWithdrawAmount] = useState('');
+  const [isDepositLoading, setIsDepositLoading] = useState(false);
+  const [isWithdrawLoading, setIsWithdrawLoading] = useState(false);
   const [pendingTransaction, setPendingTransaction] = useState<string | null>(null);
-  const [depositError, setDepositError] = useState<string | null>(null);
+  const [transactionError, setTransactionError] = useState<string | null>(null);
 
-  // Transaction history mock data
+  useEffect(() => {
+    return () => {
+      paymentService.stopAllStatusChecks();
+    };
+  }, []);
+
   const transactions = [
     { id: 1, type: 'Deposit', amount: 100, date: '2023-08-15', status: 'completed' },
     { id: 2, type: 'Game Entry', amount: -20, date: '2023-08-15', status: 'completed' },
@@ -29,7 +35,6 @@ const Profile = () => {
     { id: 6, type: 'Referral Bonus', amount: 10, date: '2023-08-12', status: 'completed' },
   ];
 
-  // Game history mock data
   const gameHistory = [
     { id: 1, category: 'Finance 🏦', date: '2023-08-15', position: 1, prize: 80 },
     { id: 2, type: 'Crypto 💰', date: '2023-08-14', position: 3, prize: 0 },
@@ -38,26 +43,60 @@ const Profile = () => {
     { id: 5, type: 'Business 📈', date: '2023-08-11', position: 1, prize: 80 },
   ];
 
-  const handleWithdraw = () => {
-    if (!amount || isNaN(parseFloat(amount)) || parseFloat(amount) < 50) {
+  const handleWithdraw = async () => {
+    if (!withdrawAmount || isNaN(parseFloat(withdrawAmount)) || parseFloat(withdrawAmount) < 50) {
       toast.error('Please enter a valid amount (minimum Ksh. 50)');
       return;
     }
     
-    setIsLoading(true);
+    if (!user?.phoneNumber) {
+      toast.error('Phone number not found. Please update your profile.');
+      return;
+    }
     
-    // Simulate API call
-    setTimeout(() => {
-      toast.success(`Withdrawal of Ksh. ${amount} has been initiated to ${user?.phoneNumber}`);
-      setAmount('');
-      setIsLoading(false);
-    }, 1500);
+    setIsWithdrawLoading(true);
+    setTransactionError(null);
+    
+    try {
+      const response = await paymentService.withdrawToMobile(
+        parseFloat(withdrawAmount), 
+        user.phoneNumber
+      );
+      
+      if (response.success && response.data) {
+        toast.success(`Withdrawal of Ksh. ${withdrawAmount} has been initiated to ${user.phoneNumber}`);
+        setPendingTransaction(response.data.merchant_reference);
+        
+        paymentService.startStatusCheck(
+          response.data.merchant_reference,
+          (status) => {
+            if (status === TransactionStatus.SUCCESS) {
+              setPendingTransaction(null);
+              toast.success(`Withdrawal of Ksh. ${withdrawAmount} successful!`);
+              setWithdrawAmount('');
+            } else if (status === TransactionStatus.FAILED) {
+              setPendingTransaction(null);
+              toast.error('Withdrawal failed. Please try again.');
+            }
+          }
+        );
+      } else {
+        setTransactionError(response.error || 'Failed to initiate withdrawal');
+        toast.error(response.error || 'Failed to initiate withdrawal');
+      }
+    } catch (error) {
+      console.error('Withdrawal error:', error);
+      setTransactionError(error instanceof Error ? error.message : 'Unknown error occurred');
+      toast.error('Failed to process withdrawal. Please try again.');
+    } finally {
+      setIsWithdrawLoading(false);
+    }
   };
 
   const handleDeposit = async () => {
-    setDepositError(null);
+    setTransactionError(null);
     
-    if (!amount || isNaN(parseFloat(amount)) || parseFloat(amount) < 20) {
+    if (!depositAmount || isNaN(parseFloat(depositAmount)) || parseFloat(depositAmount) < 20) {
       toast.error('Please enter a valid amount (minimum Ksh. 20)');
       return;
     }
@@ -67,44 +106,41 @@ const Profile = () => {
       return;
     }
     
-    setIsLoading(true);
+    setIsDepositLoading(true);
     
     try {
-      const response = await paymentService.initiateSTKPush(parseFloat(amount), user.phoneNumber);
+      const response = await paymentService.initiateSTKPush(
+        parseFloat(depositAmount), 
+        user.phoneNumber
+      );
       
       if (response.success && response.data) {
         toast.success('STK push initiated. Please check your phone to complete the transaction.');
         setPendingTransaction(response.data.reference);
         
-        // Start polling for status updates
-        const checkInterval = setInterval(async () => {
-          try {
-            const status = await paymentService.checkTransactionStatus(response.data!.reference);
-            
-            if (status === 'SUCCESS') {
-              clearInterval(checkInterval);
+        paymentService.startStatusCheck(
+          response.data.reference,
+          (status) => {
+            if (status === TransactionStatus.SUCCESS) {
               setPendingTransaction(null);
-              toast.success(`Deposit of Ksh. ${amount} successful!`);
-              setAmount('');
-            } else if (['failed', 'cancelled'].includes(status)) {
-              clearInterval(checkInterval);
+              toast.success(`Deposit of Ksh. ${depositAmount} successful!`);
+              setDepositAmount('');
+            } else if (status === TransactionStatus.FAILED) {
               setPendingTransaction(null);
-              toast.error(`Transaction ${status}. Please try again.`);
+              toast.error('Transaction failed. Please try again.');
             }
-          } catch (error) {
-            console.error('Status check error:', error);
           }
-        }, 5000);
+        );
       } else {
-        setDepositError(response.error || 'Failed to initiate payment');
+        setTransactionError(response.error || 'Failed to initiate payment');
         toast.error(response.error || 'Failed to initiate payment');
       }
     } catch (error) {
       console.error('Deposit error:', error);
-      setDepositError(error instanceof Error ? error.message : 'Unknown error occurred');
+      setTransactionError(error instanceof Error ? error.message : 'Unknown error occurred');
       toast.error('Failed to process payment. Please try again.');
     } finally {
-      setIsLoading(false);
+      setIsDepositLoading(false);
     }
   };
 
@@ -120,7 +156,6 @@ const Profile = () => {
         <h1 className="text-3xl font-bold text-trivia-text">My Profile</h1>
         
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Left Column - User Info */}
           <Card className="lg:col-span-1">
             <CardHeader>
               <CardTitle>Account Information</CardTitle>
@@ -155,7 +190,6 @@ const Profile = () => {
             </CardContent>
           </Card>
           
-          {/* Right Column - Tabs */}
           <Card className="lg:col-span-2">
             <CardContent className="p-6">
               <Tabs defaultValue="wallet">
@@ -192,16 +226,16 @@ const Profile = () => {
                     <Alert className="bg-yellow-50 border-yellow-200">
                       <AlertTitle className="text-yellow-800">Transaction in Progress</AlertTitle>
                       <AlertDescription className="text-yellow-700">
-                        Please check your phone and complete the M-Pesa payment. 
+                        Please check your phone and complete the payment process. 
                         This status will update automatically.
                       </AlertDescription>
                     </Alert>
                   )}
                   
-                  {depositError && (
+                  {transactionError && (
                     <Alert variant="destructive">
-                      <AlertTitle>Payment Error</AlertTitle>
-                      <AlertDescription>{depositError}</AlertDescription>
+                      <AlertTitle>Transaction Error</AlertTitle>
+                      <AlertDescription>{transactionError}</AlertDescription>
                     </Alert>
                   )}
                   
@@ -218,17 +252,17 @@ const Profile = () => {
                             id="depositAmount" 
                             type="number" 
                             placeholder="Min: Ksh. 20" 
-                            value={amount}
-                            onChange={(e) => setAmount(e.target.value)}
-                            disabled={isLoading || !!pendingTransaction}
+                            value={depositAmount}
+                            onChange={(e) => setDepositAmount(e.target.value)}
+                            disabled={isDepositLoading || !!pendingTransaction}
                           />
                         </div>
                         <Button 
                           className="w-full bg-trivia-primary hover:bg-trivia-primary/90"
                           onClick={handleDeposit}
-                          disabled={isLoading || !!pendingTransaction}
+                          disabled={isDepositLoading || !!pendingTransaction}
                         >
-                          {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                          {isDepositLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                           {pendingTransaction ? 'Processing...' : 'Deposit via M-Pesa'}
                         </Button>
                       </CardContent>
@@ -246,17 +280,17 @@ const Profile = () => {
                             id="withdrawAmount" 
                             type="number" 
                             placeholder="Min: Ksh. 50" 
-                            value={amount}
-                            onChange={(e) => setAmount(e.target.value)}
-                            disabled={isLoading}
+                            value={withdrawAmount}
+                            onChange={(e) => setWithdrawAmount(e.target.value)}
+                            disabled={isWithdrawLoading || !!pendingTransaction}
                           />
                         </div>
                         <Button 
                           className="w-full bg-trivia-primary hover:bg-trivia-primary/90"
                           onClick={handleWithdraw}
-                          disabled={isLoading}
+                          disabled={isWithdrawLoading || !!pendingTransaction}
                         >
-                          {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                          {isWithdrawLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                           Withdraw to M-Pesa
                         </Button>
                       </CardContent>
