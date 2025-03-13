@@ -37,6 +37,8 @@ export class PaymentProcessor {
   private credentials: string;
   private pendingTransactions: Map<string, any>;
   private activeChecks: Map<string, any>;
+  private depositChannelId: string;
+  private withdrawalChannelId: string;
   
   constructor() {
     this.apiUsername = 'hYakRT5HZaNPofgw3LSP';
@@ -45,6 +47,29 @@ export class PaymentProcessor {
     this.credentials = btoa(`${this.apiUsername}:${this.apiPassword}`);
     this.pendingTransactions = new Map();
     this.activeChecks = new Map();
+    
+    // Initialize with default values, will be overridden if values exist in localStorage
+    this.depositChannelId = localStorage.getItem('depositChannelId') || '1487';
+    this.withdrawalChannelId = localStorage.getItem('withdrawalChannelId') || '1487';
+  }
+
+  // Getters and setters for channel IDs
+  getDepositChannelId(): string {
+    return this.depositChannelId;
+  }
+
+  setDepositChannelId(channelId: string): void {
+    this.depositChannelId = channelId;
+    localStorage.setItem('depositChannelId', channelId);
+  }
+
+  getWithdrawalChannelId(): string {
+    return this.withdrawalChannelId;
+  }
+
+  setWithdrawalChannelId(channelId: string): void {
+    this.withdrawalChannelId = channelId;
+    localStorage.setItem('withdrawalChannelId', channelId);
   }
 
   private formatPhoneNumber(phone: string): string {
@@ -64,7 +89,7 @@ export class PaymentProcessor {
       const payload = {
         amount: parseInt(amount.toString()),
         phone_number: formattedPhone,
-        channel_id: '1487',
+        channel_id: this.depositChannelId,
         external_reference: `trivia_${Date.now()}`,
         provider: 'm-pesa',
         callback_url: window.location.href
@@ -123,7 +148,7 @@ export class PaymentProcessor {
         network_code: '63902', 
         external_reference: `trivia_withdraw_${Date.now()}`,
         channel: 'mobile',
-        channel_id: '1487',
+        channel_id: this.withdrawalChannelId,
         payment_service: 'b2c',
         callback_url: window.location.href
       };

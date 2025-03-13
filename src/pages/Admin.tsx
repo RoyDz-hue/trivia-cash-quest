@@ -8,10 +8,11 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { useNavigate } from 'react-router-dom';
-import { BarChart, Users, Award, Settings, Send, Plus, Database, XCircle } from 'lucide-react';
+import { BarChart, Users, Award, Settings, Send, Plus, Database, XCircle, CreditCard } from 'lucide-react';
 import { Category, Question } from '@/types';
 import { toast } from 'sonner';
 import { GenerateQuestionParams } from '@/services/deepInfraService';
+import { paymentService } from '@/services/paymentService';
 
 const Admin = () => {
   const { user, isAdmin, deepInfraService } = useAuth();
@@ -22,8 +23,10 @@ const Admin = () => {
   const [apiKey, setApiKey] = useState('');
   const [payHeroKey, setPayHeroKey] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('Finance');
+  
+  const [depositChannelId, setDepositChannelId] = useState(paymentService.getDepositChannelId());
+  const [withdrawalChannelId, setWithdrawalChannelId] = useState(paymentService.getWithdrawalChannelId());
 
-  // Redirect if not admin
   useEffect(() => {
     if (!isAdmin) {
       navigate('/dashboard');
@@ -31,7 +34,6 @@ const Admin = () => {
     }
   }, [isAdmin, navigate]);
 
-  // Mock categories for the demo
   const categories: Category[] = [
     {
       id: '1',
@@ -59,7 +61,6 @@ const Admin = () => {
     },
   ];
 
-  // Mock user data
   const mockUsers = [
     { id: '1', username: 'user1', email: 'user1@example.com', phoneNumber: '+254700000001', status: 'active' },
     { id: '2', username: 'user2', email: 'user2@example.com', phoneNumber: '+254700000002', status: 'active' },
@@ -101,12 +102,18 @@ const Admin = () => {
     toast.success('API keys saved successfully!');
   };
 
+  const savePaymentSettings = () => {
+    paymentService.setDepositChannelId(depositChannelId);
+    paymentService.setWithdrawalChannelId(withdrawalChannelId);
+    toast.success('Payment settings saved successfully!');
+  };
+
   return (
     <Layout>
       <h1 className="text-3xl font-bold mb-6">Admin Dashboard</h1>
       
       <Tabs defaultValue="dashboard">
-        <TabsList className="grid w-full grid-cols-5">
+        <TabsList className="grid w-full grid-cols-6">
           <TabsTrigger value="dashboard" className="flex items-center gap-2">
             <BarChart size={16} />
             <span>Overview</span>
@@ -122,6 +129,10 @@ const Admin = () => {
           <TabsTrigger value="games" className="flex items-center gap-2">
             <Award size={16} />
             <span>Games</span>
+          </TabsTrigger>
+          <TabsTrigger value="payments" className="flex items-center gap-2">
+            <CreditCard size={16} />
+            <span>Payments</span>
           </TabsTrigger>
           <TabsTrigger value="settings" className="flex items-center gap-2">
             <Settings size={16} />
@@ -424,6 +435,88 @@ const Admin = () => {
                     </div>
                   </Card>
                 ))}
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+        
+        <TabsContent value="payments" className="mt-6 space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Payment Channel Configuration</CardTitle>
+              <CardDescription>
+                Configure PayHero channel IDs for deposits and withdrawals
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="depositChannelId">Deposit Channel ID (M-Pesa STK Push)</Label>
+                <Input 
+                  id="depositChannelId" 
+                  value={depositChannelId}
+                  onChange={(e) => setDepositChannelId(e.target.value)}
+                  placeholder="1487"
+                />
+                <p className="text-sm text-muted-foreground">Channel ID for processing deposits via M-Pesa STK Push</p>
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="withdrawalChannelId">Withdrawal Channel ID (M-Pesa B2C)</Label>
+                <Input 
+                  id="withdrawalChannelId" 
+                  value={withdrawalChannelId}
+                  onChange={(e) => setWithdrawalChannelId(e.target.value)}
+                  placeholder="1487"
+                />
+                <p className="text-sm text-muted-foreground">Channel ID for processing withdrawals via M-Pesa B2C</p>
+              </div>
+              
+              <Button 
+                onClick={savePaymentSettings}
+                className="bg-trivia-primary hover:bg-trivia-primary/90"
+              >
+                Save Payment Settings
+              </Button>
+            </CardContent>
+          </Card>
+          
+          <Card>
+            <CardHeader>
+              <CardTitle>Recent Transactions</CardTitle>
+              <CardDescription>Overview of the most recent payments and withdrawals</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="rounded-md border">
+                <div className="grid grid-cols-5 bg-muted p-3 font-medium">
+                  <div>Type</div>
+                  <div>User</div>
+                  <div>Amount</div>
+                  <div>Status</div>
+                  <div>Date</div>
+                </div>
+                <div className="divide-y">
+                  <div className="grid grid-cols-5 p-3">
+                    <div>Deposit</div>
+                    <div>user1</div>
+                    <div>Ksh. 100</div>
+                    <div className="text-green-600">Completed</div>
+                    <div>Today, 10:30 AM</div>
+                  </div>
+                  <div className="grid grid-cols-5 p-3">
+                    <div>Withdrawal</div>
+                    <div>user2</div>
+                    <div>Ksh. 250</div>
+                    <div className="text-green-600">Completed</div>
+                    <div>Today, 9:15 AM</div>
+                  </div>
+                  <div className="grid grid-cols-5 p-3">
+                    <div>Game Entry</div>
+                    <div>user3</div>
+                    <div>Ksh. 20</div>
+                    <div className="text-green-600">Completed</div>
+                    <div>Yesterday, 7:22 PM</div>
+                  </div>
+                </div>
               </div>
             </CardContent>
           </Card>
