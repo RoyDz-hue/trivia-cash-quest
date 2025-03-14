@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import Layout from '@/components/Layout';
 import { useAuth } from '@/contexts/AuthContext';
@@ -8,21 +9,22 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { useNavigate } from 'react-router-dom';
-import { BarChart, Users, Award, Settings, Send, Plus, Database, XCircle, CreditCard } from 'lucide-react';
+import { BarChart, Users, Award, Settings, Send, Plus, Database, XCircle, CreditCard, Loader2 } from 'lucide-react';
 import { Category, Question } from '@/types';
 import { toast } from 'sonner';
-import { GenerateQuestionParams } from '@/services/deepInfraService';
+import { GenerateQuestionParams, GeneratedQuestion } from '@/services/deepInfraService';
 import { paymentService } from '@/services/paymentService';
 
 const Admin = () => {
   const { user, isAdmin, deepInfraService } = useAuth();
   const navigate = useNavigate();
   const [generateQuestionPrompt, setGenerateQuestionPrompt] = useState('Generate a multiple-choice trivia question about finance with 4 answer options, one correct and three misleading but realistic.');
-  const [generatedQuestion, setGeneratedQuestion] = useState('');
+  const [generatedQuestions, setGeneratedQuestions] = useState<GeneratedQuestion[]>([]);
   const [isGenerating, setIsGenerating] = useState(false);
   const [apiKey, setApiKey] = useState('');
   const [payHeroKey, setPayHeroKey] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('Finance');
+  const [questionCount, setQuestionCount] = useState(10);
   
   const [depositChannelId, setDepositChannelId] = useState(paymentService.getDepositChannelId());
   const [withdrawalChannelId, setWithdrawalChannelId] = useState(paymentService.getWithdrawalChannelId());
@@ -68,7 +70,7 @@ const Admin = () => {
     { id: '4', username: 'user4', email: 'user4@example.com', phoneNumber: '+254700000004', status: 'active' },
   ];
 
-  const handleGenerateQuestion = async () => {
+  const handleGenerateQuestions = async () => {
     if (!deepInfraService) {
       toast.error('DeepInfra service is not initialized');
       return;
@@ -79,20 +81,20 @@ const Admin = () => {
       const params: GenerateQuestionParams = {
         category: selectedCategory,
         difficulty: 'medium',
+        count: questionCount
       };
 
-      const question = await deepInfraService.generateTrivaQuestion(params);
+      const questions = await deepInfraService.generateMultipleQuestions(params);
       
-      if (question) {
-        const formattedQuestion = `Question: ${question.question}\n\nA) ${question.options[0]}\nB) ${question.options[1]}\nC) ${question.options[2]}\nD) ${question.options[3]}\n\nCorrect Answer: ${['A', 'B', 'C', 'D'][question.correctAnswer]}`;
-        setGeneratedQuestion(formattedQuestion);
-        toast.success('Question generated successfully!');
+      if (questions && questions.length > 0) {
+        setGeneratedQuestions(questions);
+        toast.success(`${questions.length} questions generated successfully!`);
       } else {
-        toast.error('Failed to generate a properly formatted question');
+        toast.error('Failed to generate properly formatted questions');
       }
     } catch (error) {
-      console.error('Error generating question:', error);
-      toast.error('Failed to generate question. Please try again.');
+      console.error('Error generating questions:', error);
+      toast.error('Failed to generate questions. Please try again.');
     } finally {
       setIsGenerating(false);
     }
@@ -106,6 +108,10 @@ const Admin = () => {
     paymentService.setDepositChannelId(depositChannelId);
     paymentService.setWithdrawalChannelId(withdrawalChannelId);
     toast.success('Payment settings saved successfully!');
+  };
+
+  const formatQuestionText = (question: GeneratedQuestion) => {
+    return `Question: ${question.question}\n\nA) ${question.options[0]}\nB) ${question.options[1]}\nC) ${question.options[2]}\nD) ${question.options[3]}\n\nCorrect Answer: ${['A', 'B', 'C', 'D'][question.correctAnswer]}`;
   };
 
   return (
@@ -218,44 +224,74 @@ const Admin = () => {
             <CardHeader>
               <CardTitle>AI Question Generator</CardTitle>
               <CardDescription>
-                Generate trivia questions using the DeepInfra API
+                Generate multiple trivia questions using the DeepInfra API
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="category">Category</Label>
-                <select 
-                  id="category"
-                  className="w-full px-3 py-2 border rounded-md"
-                  value={selectedCategory}
-                  onChange={(e) => setSelectedCategory(e.target.value)}
-                >
-                  {categories.map(category => (
-                    <option key={category.id} value={category.name}>
-                      {category.name} {category.icon}
-                    </option>
-                  ))}
-                </select>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="category">Category</Label>
+                  <select 
+                    id="category"
+                    className="w-full px-3 py-2 border rounded-md"
+                    value={selectedCategory}
+                    onChange={(e) => setSelectedCategory(e.target.value)}
+                  >
+                    {categories.map(category => (
+                      <option key={category.id} value={category.name}>
+                        {category.name} {category.icon}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="questionCount">Number of Questions</Label>
+                  <Input 
+                    id="questionCount" 
+                    type="number" 
+                    min="1" 
+                    max="20" 
+                    value={questionCount} 
+                    onChange={(e) => setQuestionCount(parseInt(e.target.value) || 10)}
+                  />
+                </div>
               </div>
               
               <Button 
-                onClick={handleGenerateQuestion}
+                onClick={handleGenerateQuestions}
                 disabled={isGenerating}
                 className="bg-trivia-primary hover:bg-trivia-primary/90"
               >
-                {isGenerating ? 'Generating...' : 'Generate Question'}
+                {isGenerating ? (
+                  <>
+                    <Loader2 size={16} className="mr-2 animate-spin" />
+                    Generating...
+                  </>
+                ) : (
+                  `Generate ${questionCount} Questions`
+                )}
               </Button>
               
-              {generatedQuestion && (
-                <div className="bg-muted p-4 rounded-md whitespace-pre-line mt-4">
-                  <h3 className="font-medium mb-2">Generated Question:</h3>
-                  <div className="text-sm">{generatedQuestion}</div>
-                  <div className="flex gap-2 mt-4">
-                    <Button size="sm" variant="outline">Edit</Button>
-                    <Button size="sm" className="bg-trivia-primary hover:bg-trivia-primary/90">
-                      Save to Database
-                    </Button>
-                  </div>
+              {generatedQuestions.length > 0 && (
+                <div className="mt-4 border rounded-md divide-y">
+                  <div className="p-3 bg-muted font-medium">Generated Questions</div>
+                  {generatedQuestions.map((question, index) => (
+                    <div key={index} className="p-4">
+                      <div className="flex justify-between items-start mb-2">
+                        <h3 className="font-medium text-sm">Question {index + 1}:</h3>
+                        <div className="flex gap-2">
+                          <Button size="sm" variant="outline">Edit</Button>
+                          <Button size="sm" className="bg-trivia-primary hover:bg-trivia-primary/90">
+                            Save to Database
+                          </Button>
+                        </div>
+                      </div>
+                      <div className="bg-muted p-3 rounded-md whitespace-pre-line text-sm">
+                        {formatQuestionText(question)}
+                      </div>
+                    </div>
+                  ))}
                 </div>
               )}
             </CardContent>
