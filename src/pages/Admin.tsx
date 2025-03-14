@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import Layout from '@/components/Layout';
 import { useAuth } from '@/contexts/AuthContext';
@@ -461,7 +460,7 @@ const Admin = () => {
                           className="flex-1 flex items-center justify-center gap-1"
                           onClick={() => {
                             setSelectedCategory(category.name);
-                            handleGenerateQuestion();
+                            handleGenerateQuestions();
                           }}
                         >
                           <Database size={14} />
