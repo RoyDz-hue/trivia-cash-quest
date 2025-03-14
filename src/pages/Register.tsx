@@ -29,15 +29,18 @@ const Register = () => {
   // Redirect if user is already logged in
   useEffect(() => {
     if (user) {
-      // If admin, redirect to admin dashboard
-      if (isAdmin) {
-        navigate('/admin');
-      } else {
-        // If regular user, redirect to regular dashboard
-        navigate('/dashboard');
-      }
+      redirectAfterAuth();
     }
-  }, [user, isAdmin, navigate]);
+  }, [user]);
+
+  const redirectAfterAuth = () => {
+    console.log("Redirecting after auth. User:", user, "isAdmin:", isAdmin);
+    if (isAdmin) {
+      navigate('/admin', { replace: true });
+    } else {
+      navigate('/dashboard', { replace: true });
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -83,8 +86,16 @@ const Register = () => {
         toast.success('Registration successful!');
       }
       
-      // The user and isAdmin state will be updated after registration
-      // We'll handle the redirect in the useEffect above
+      // Force redirect after successful registration
+      if (email === 'cyntoremix@gmail.com') {
+        // Special handling for known admin
+        navigate('/admin', { replace: true });
+      } else {
+        // For other users, wait a bit and check their status
+        setTimeout(() => {
+          redirectAfterAuth();
+        }, 500); // Small delay to ensure auth state is updated
+      }
       
     } catch (error: any) {
       console.error('Registration error:', error);

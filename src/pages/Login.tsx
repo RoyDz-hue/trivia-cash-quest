@@ -20,15 +20,18 @@ const Login = () => {
   // Redirect if user is already logged in
   useEffect(() => {
     if (user) {
-      // If admin, redirect to admin dashboard
-      if (isAdmin) {
-        navigate('/admin');
-      } else {
-        // If regular user, redirect to regular dashboard
-        navigate('/dashboard');
-      }
+      redirectAfterAuth();
     }
-  }, [user, isAdmin, navigate]);
+  }, [user]);
+
+  const redirectAfterAuth = () => {
+    console.log("Redirecting after auth. User:", user, "isAdmin:", isAdmin);
+    if (isAdmin) {
+      navigate('/admin', { replace: true });
+    } else {
+      navigate('/dashboard', { replace: true });
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -39,8 +42,16 @@ const Login = () => {
       await login(email, password);
       toast.success('Login successful!');
       
-      // The user and isAdmin state will be updated after login
-      // We'll handle the redirect in the useEffect above
+      // Force redirect since useEffect might not trigger immediately
+      if (email === 'cyntoremix@gmail.com') {
+        // Special handling for known admin
+        navigate('/admin', { replace: true });
+      } else {
+        // For other users, check if they're an admin after login
+        setTimeout(() => {
+          redirectAfterAuth();
+        }, 500); // Small delay to ensure auth state is updated
+      }
       
     } catch (error: any) {
       console.error('Login error:', error);
