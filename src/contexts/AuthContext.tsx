@@ -2,6 +2,8 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { User } from '@/types';
 import { createDeepInfraService, DeepInfraService } from '@/services/deepInfraService';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 
 interface AuthContextType {
   user: User | null;
@@ -38,36 +40,98 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   }, [deepInfraApiKey]);
 
   useEffect(() => {
-    // Check local storage for user data on initial load
-    const storedUser = localStorage.getItem('triviaUser');
-    if (storedUser) {
-      setUser(JSON.parse(storedUser));
-    }
-    setIsLoading(false);
+    // Check for active Supabase session on initial load
+    const checkSession = async () => {
+      setIsLoading(true);
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+
+        if (session) {
+          // Get user profile data
+          const { data: profile, error: profileError } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', session.user.id)
+            .single();
+
+          if (profileError) {
+            console.error('Error fetching profile data:', profileError);
+            throw profileError;
+          }
+
+          if (profile) {
+            setUser({
+              id: profile.id,
+              username: profile.username,
+              email: profile.email,
+              phoneNumber: profile.phone_number || '',
+              isAdmin: profile.is_admin || false
+            });
+          }
+        }
+      } catch (error) {
+        console.error('Session check error:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    checkSession();
+
+    // Set up auth state change listener
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        if (event === 'SIGNED_IN' && session) {
+          // Get user profile data
+          const { data: profile, error: profileError } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', session.user.id)
+            .single();
+
+          if (profileError) {
+            console.error('Error fetching profile data:', profileError);
+            return;
+          }
+
+          if (profile) {
+            setUser({
+              id: profile.id,
+              username: profile.username,
+              email: profile.email,
+              phoneNumber: profile.phone_number || '',
+              isAdmin: profile.is_admin || false
+            });
+          }
+        } else if (event === 'SIGNED_OUT') {
+          setUser(null);
+        }
+      }
+    );
+
+    // Cleanup subscription on unmount
+    return () => {
+      subscription.unsubscribe();
+    };
   }, []);
 
   const login = async (email: string, password: string) => {
-    // This is a mock implementation that would be replaced with actual Supabase auth
     setIsLoading(true);
     try {
-      // Check if email is admin email
-      const isAdminUser = email === ADMIN_EMAIL || email.includes('admin');
-      
-      // Mock login for demo purposes
-      const mockUser = {
-        id: '1',
-        username: email.split('@')[0],
+      const { data, error } = await supabase.auth.signInWithPassword({
         email,
-        phoneNumber: '+254700000000',
-        isAdmin: isAdminUser
-      };
-      setUser(mockUser);
-      localStorage.setItem('triviaUser', JSON.stringify(mockUser));
-      
-      // Return the isAdmin status so we can redirect appropriately
+        password
+      });
+
+      if (error) {
+        throw error;
+      }
+
+      // Profile data will be fetched by the auth state change listener
       return Promise.resolve();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Login error:', error);
+      toast.error(error.message || 'Login failed. Please check your credentials.');
       throw error;
     } finally {
       setIsLoading(false);
@@ -75,34 +139,47 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   const register = async (userData: Omit<User, 'id' | 'isAdmin'>, password: string) => {
-    // This is a mock implementation that would be replaced with actual Supabase auth
     setIsLoading(true);
     try {
-      // Check if email is admin email
-      const isAdminUser = userData.email === ADMIN_EMAIL || userData.email.includes('admin');
+      const { data, error } = await supabase.auth.signUp({
+        email: userData.email,
+        password,
+        options: {
+          data: {
+            username: userData.username,
+            phone_number: userData.phoneNumber
+          }
+        }
+      });
+
+      if (error) {
+        throw error;
+      }
+
+      // Profile data will be created by the database trigger and
+      // fetched by the auth state change listener
       
-      // Mock registration for demo purposes
-      const mockUser = {
-        id: Math.random().toString(36).substring(2, 9),
-        ...userData,
-        isAdmin: isAdminUser
-      };
-      setUser(mockUser);
-      localStorage.setItem('triviaUser', JSON.stringify(mockUser));
-      
-      // Return the isAdmin status so we can redirect appropriately
       return Promise.resolve();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Registration error:', error);
+      toast.error(error.message || 'Registration failed. Please try again.');
       throw error;
     } finally {
       setIsLoading(false);
     }
   };
 
-  const logout = () => {
-    setUser(null);
-    localStorage.removeItem('triviaUser');
+  const logout = async () => {
+    try {
+      const { error } = await supabase.auth.signOut();
+      if (error) {
+        throw error;
+      }
+      setUser(null);
+    } catch (error) {
+      console.error('Logout error:', error);
+      toast.error('Failed to log out. Please try again.');
+    }
   };
 
   return (

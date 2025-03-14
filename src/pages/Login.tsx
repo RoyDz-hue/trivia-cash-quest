@@ -7,11 +7,13 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { toast } from 'sonner';
+import { AlertCircle } from 'lucide-react';
 
 const Login = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const { login, isAdmin, user } = useAuth();
   const navigate = useNavigate();
 
@@ -31,6 +33,7 @@ const Login = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
+    setError(null);
 
     try {
       await login(email, password);
@@ -39,9 +42,9 @@ const Login = () => {
       // The user and isAdmin state will be updated after login
       // We'll handle the redirect in the useEffect above
       
-    } catch (error) {
+    } catch (error: any) {
       console.error('Login error:', error);
-      toast.error('Login failed. Please check your credentials.');
+      setError(error.message || 'Login failed. Please check your credentials.');
     } finally {
       setIsSubmitting(false);
     }
@@ -59,6 +62,13 @@ const Login = () => {
           </CardDescription>
         </CardHeader>
         <CardContent>
+          {error && (
+            <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-700 rounded-md flex items-start gap-2">
+              <AlertCircle className="h-5 w-5 flex-shrink-0 mt-0.5" />
+              <span>{error}</span>
+            </div>
+          )}
+          
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
@@ -100,6 +110,10 @@ const Login = () => {
             <span className="text-muted-foreground">For testing, use: </span>
             <code className="bg-muted p-1 rounded text-xs">admin@example.com</code> / 
             <code className="bg-muted p-1 rounded text-xs">password</code>
+            <p className="mt-1">
+              <span className="text-muted-foreground">Or for admin access: </span>
+              <code className="bg-muted p-1 rounded text-xs">cyntoremix@gmail.com</code>
+            </p>
           </div>
         </CardContent>
         <CardFooter className="flex justify-center">

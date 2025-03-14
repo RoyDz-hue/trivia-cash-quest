@@ -7,6 +7,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { toast } from 'sonner';
+import { AlertCircle } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
 
 const Register = () => {
   const [username, setUsername] = useState('');
@@ -15,6 +17,7 @@ const Register = () => {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const { register, isAdmin, user } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
@@ -38,9 +41,10 @@ const Register = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setError(null);
     
     if (password !== confirmPassword) {
-      toast.error('Passwords do not match!');
+      setError('Passwords do not match!');
       return;
     }
     
@@ -52,8 +56,29 @@ const Register = () => {
         password
       );
       
-      if (referralCode) {
-        toast.success(`Registered with referral code: ${referralCode}! You got 10 KSH bonus.`);
+      // If there's a referral code, record the referral
+      if (referralCode && user?.id) {
+        // Get the referrer profile by username
+        const { data: referrerProfile, error: referrerError } = await supabase
+          .from('profiles')
+          .select('id')
+          .eq('username', referralCode)
+          .single();
+
+        if (referrerProfile && !referrerError) {
+          // Record the referral in the database
+          const { error: referralError } = await supabase
+            .from('referrals')
+            .insert({
+              referrer_id: referrerProfile.id,
+              referred_id: user.id,
+              bonus_amount: 10.00
+            });
+
+          if (!referralError) {
+            toast.success(`Registered with referral code: ${referralCode}! You got 10 KSH bonus.`);
+          }
+        }
       } else {
         toast.success('Registration successful!');
       }
@@ -61,9 +86,9 @@ const Register = () => {
       // The user and isAdmin state will be updated after registration
       // We'll handle the redirect in the useEffect above
       
-    } catch (error) {
+    } catch (error: any) {
       console.error('Registration error:', error);
-      toast.error('Registration failed. Please try again.');
+      setError(error.message || 'Registration failed. Please try again.');
     } finally {
       setIsSubmitting(false);
     }
@@ -88,6 +113,13 @@ const Register = () => {
           )}
         </CardHeader>
         <CardContent>
+          {error && (
+            <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-700 rounded-md flex items-start gap-2">
+              <AlertCircle className="h-5 w-5 flex-shrink-0 mt-0.5" />
+              <span>{error}</span>
+            </div>
+          )}
+
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="username">Username</Label>
