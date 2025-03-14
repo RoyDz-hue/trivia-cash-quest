@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
@@ -12,8 +12,21 @@ const Login = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const { login } = useAuth();
+  const { login, isAdmin, user } = useAuth();
   const navigate = useNavigate();
+
+  // Redirect if user is already logged in
+  useEffect(() => {
+    if (user) {
+      // If admin, redirect to admin dashboard
+      if (isAdmin) {
+        navigate('/admin');
+      } else {
+        // If regular user, redirect to regular dashboard
+        navigate('/dashboard');
+      }
+    }
+  }, [user, isAdmin, navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -22,7 +35,10 @@ const Login = () => {
     try {
       await login(email, password);
       toast.success('Login successful!');
-      navigate('/dashboard');
+      
+      // The user and isAdmin state will be updated after login
+      // We'll handle the redirect in the useEffect above
+      
     } catch (error) {
       console.error('Login error:', error);
       toast.error('Login failed. Please check your credentials.');

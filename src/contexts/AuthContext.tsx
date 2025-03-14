@@ -1,3 +1,4 @@
+
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { User } from '@/types';
 import { createDeepInfraService, DeepInfraService } from '@/services/deepInfraService';
@@ -19,6 +20,9 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 // The DeepInfra API key
 // Note: In a production environment, this should be stored in a secure backend service
 const DEEPINFRA_API_KEY = "3ZJE3fsTlDv1pLKVtfdNQbRPvwhmfHfF";
+
+// Admin email for automatic recognition
+const ADMIN_EMAIL = "cyntoremix@gmail.com";
 
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
@@ -46,16 +50,22 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     // This is a mock implementation that would be replaced with actual Supabase auth
     setIsLoading(true);
     try {
+      // Check if email is admin email
+      const isAdminUser = email === ADMIN_EMAIL || email.includes('admin');
+      
       // Mock login for demo purposes
       const mockUser = {
         id: '1',
         username: email.split('@')[0],
         email,
         phoneNumber: '+254700000000',
-        isAdmin: email === 'cyntoremix@gmail.com' || email.includes('admin')
+        isAdmin: isAdminUser
       };
       setUser(mockUser);
       localStorage.setItem('triviaUser', JSON.stringify(mockUser));
+      
+      // Return the isAdmin status so we can redirect appropriately
+      return Promise.resolve();
     } catch (error) {
       console.error('Login error:', error);
       throw error;
@@ -68,14 +78,20 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     // This is a mock implementation that would be replaced with actual Supabase auth
     setIsLoading(true);
     try {
+      // Check if email is admin email
+      const isAdminUser = userData.email === ADMIN_EMAIL || userData.email.includes('admin');
+      
       // Mock registration for demo purposes
       const mockUser = {
         id: Math.random().toString(36).substring(2, 9),
         ...userData,
-        isAdmin: userData.email === 'cyntoremix@gmail.com' || userData.email.includes('admin')
+        isAdmin: isAdminUser
       };
       setUser(mockUser);
       localStorage.setItem('triviaUser', JSON.stringify(mockUser));
+      
+      // Return the isAdmin status so we can redirect appropriately
+      return Promise.resolve();
     } catch (error) {
       console.error('Registration error:', error);
       throw error;

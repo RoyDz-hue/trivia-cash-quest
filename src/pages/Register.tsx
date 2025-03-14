@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
@@ -15,13 +15,26 @@ const Register = () => {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const { register } = useAuth();
+  const { register, isAdmin, user } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
   // Extract referral code from URL if present
   const queryParams = new URLSearchParams(location.search);
   const referralCode = queryParams.get('ref');
+
+  // Redirect if user is already logged in
+  useEffect(() => {
+    if (user) {
+      // If admin, redirect to admin dashboard
+      if (isAdmin) {
+        navigate('/admin');
+      } else {
+        // If regular user, redirect to regular dashboard
+        navigate('/dashboard');
+      }
+    }
+  }, [user, isAdmin, navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -45,7 +58,9 @@ const Register = () => {
         toast.success('Registration successful!');
       }
       
-      navigate('/dashboard');
+      // The user and isAdmin state will be updated after registration
+      // We'll handle the redirect in the useEffect above
+      
     } catch (error) {
       console.error('Registration error:', error);
       toast.error('Registration failed. Please try again.');
