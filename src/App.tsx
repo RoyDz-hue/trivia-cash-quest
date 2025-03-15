@@ -24,7 +24,7 @@ const AdminRoute = ({ children }: { children: React.ReactNode }) => {
 
   // Show loader while checking auth
   if (isLoading) {
-    return <div className="flex h-screen items-center justify-center">Loading...</div>;
+    return <div className="flex h-screen items-center justify-center">Loading authentication status...</div>;
   }
 
   // Not logged in - redirect to login
@@ -39,6 +39,7 @@ const AdminRoute = ({ children }: { children: React.ReactNode }) => {
     return <Navigate to="/dashboard" replace />;
   }
 
+  console.log('AdminRoute - User is admin, rendering admin content');
   return <>{children}</>;
 };
 
@@ -50,7 +51,7 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   
   // Show loader while checking auth
   if (isLoading) {
-    return <div className="flex h-screen items-center justify-center">Loading...</div>;
+    return <div className="flex h-screen items-center justify-center">Loading authentication status...</div>;
   }
 
   // Not logged in - redirect to login
@@ -59,6 +60,7 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
     return <Navigate to="/login" replace />;
   }
 
+  console.log('ProtectedRoute - User is authenticated, rendering protected content');
   return <>{children}</>;
 };
 

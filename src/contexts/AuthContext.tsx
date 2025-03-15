@@ -1,3 +1,4 @@
+
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { User } from '@/types';
 import { createDeepInfraService, DeepInfraService } from '@/services/deepInfraService';
@@ -38,6 +39,26 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     }
   }, [deepInfraApiKey]);
 
+  // Function to set user with proper admin status
+  const setUserWithAdminStatus = (userData: any) => {
+    if (!userData) {
+      setUser(null);
+      return;
+    }
+    
+    const isAdminUser = userData.is_admin || userData.email === ADMIN_EMAIL;
+    console.log('Setting user with profile:', userData);
+    console.log('Admin status:', isAdminUser);
+    
+    setUser({
+      id: userData.id,
+      username: userData.username,
+      email: userData.email,
+      phoneNumber: userData.phone_number || '',
+      isAdmin: isAdminUser
+    });
+  };
+
   useEffect(() => {
     // Check for active Supabase session on initial load
     const checkSession = async () => {
@@ -62,17 +83,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           }
 
           if (profile) {
-            // Check if it's the admin
-            const isAdminUser = profile.is_admin || profile.email === ADMIN_EMAIL;
-            console.log('Setting user with admin status:', isAdminUser);
-            
-            setUser({
-              id: profile.id,
-              username: profile.username,
-              email: profile.email,
-              phoneNumber: profile.phone_number || '',
-              isAdmin: isAdminUser
-            });
+            setUserWithAdminStatus(profile);
           }
         } else {
           console.log('No session found');
@@ -109,16 +120,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
             }
 
             if (profile) {
-              const isAdminUser = profile.is_admin || profile.email === ADMIN_EMAIL;
-              console.log('Setting user with admin status:', isAdminUser);
-              
-              setUser({
-                id: profile.id,
-                username: profile.username,
-                email: profile.email,
-                phoneNumber: profile.phone_number || '',
-                isAdmin: isAdminUser
-              });
+              setUserWithAdminStatus(profile);
             }
           } catch (error) {
             console.error('Error in auth state change:', error);
@@ -155,10 +157,13 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         throw error;
       }
 
-      // Check if it's the admin email
+      // If this point is reached, auth was successful
+      toast.success('Login successful!');
+      
+      // Check if it's the admin email for immediate redirection
       const isAdminUser = email === ADMIN_EMAIL;
       
-      // Get the user profile
+      // Fetch user profile
       if (data.user) {
         const { data: profile, error: profileError } = await supabase
           .from('profiles')
@@ -174,13 +179,15 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         
         if (profile) {
           console.log('Login successful for:', email, 'Admin status:', isAdminUser || profile.is_admin);
-          setUser({
+          const userData = {
             id: profile.id,
             username: profile.username,
             email: profile.email,
-            phoneNumber: profile.phone_number || '',
-            isAdmin: isAdminUser || profile.is_admin || false
-          });
+            phone_number: profile.phone_number || '',
+            is_admin: isAdminUser || profile.is_admin || false
+          };
+          
+          setUserWithAdminStatus(userData);
         }
       }
       

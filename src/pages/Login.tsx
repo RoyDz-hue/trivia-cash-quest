@@ -40,10 +40,8 @@ const Login = () => {
     try {
       console.log('Submitting login form for:', email);
       await login(email, password);
-      toast.success('Login successful!');
       
-      // The useEffect will handle redirection based on user state
-      // This direct navigation is a fallback only
+      // Direct navigation after login
       if (email === 'cyntoremix@gmail.com') {
         console.log('Admin login detected, navigating to /admin');
         navigate('/admin', { replace: true });
