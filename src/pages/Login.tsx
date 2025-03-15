@@ -24,11 +24,14 @@ const Login = () => {
     if (user && !isLoading) {
       console.log('User is logged in, redirecting to:', isAdmin ? '/admin' : '/dashboard');
       
-      if (isAdmin) {
-        navigate('/admin', { replace: true });
-      } else {
-        navigate('/dashboard', { replace: true });
-      }
+      // Use timeout to ensure state is fully updated before navigation
+      setTimeout(() => {
+        if (isAdmin) {
+          navigate('/admin', { replace: true });
+        } else {
+          navigate('/dashboard', { replace: true });
+        }
+      }, 100);
     }
   }, [user, isAdmin, isLoading, navigate]);
 
@@ -41,17 +44,23 @@ const Login = () => {
       console.log('Submitting login form for:', email);
       await login(email, password);
       
-      // Direct navigation after login
-      if (email === 'cyntoremix@gmail.com') {
-        console.log('Admin login detected, navigating to /admin');
-        navigate('/admin', { replace: true });
-      } else {
-        console.log('Regular user login, navigating to /dashboard');
-        navigate('/dashboard', { replace: true });
-      }
+      toast.success('Login successful!');
+      
+      // Wait a moment for the auth state to update before redirection
+      setTimeout(() => {
+        // Check for admin email to redirect appropriately
+        if (email === 'cyntoremix@gmail.com') {
+          console.log('Admin login detected, navigating to /admin');
+          navigate('/admin', { replace: true });
+        } else {
+          console.log('Regular user login, navigating to /dashboard');
+          navigate('/dashboard', { replace: true });
+        }
+      }, 500);
     } catch (error: any) {
       console.error('Login form submission error:', error);
       setError(error.message || 'Login failed. Please check your credentials.');
+      toast.error(error.message || 'Login failed. Please check your credentials.');
     } finally {
       setIsSubmitting(false);
     }

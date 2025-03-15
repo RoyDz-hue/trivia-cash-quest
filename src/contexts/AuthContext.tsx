@@ -17,6 +17,7 @@ interface AuthContextType {
   deepInfraApiKey: string;
 }
 
+// Create the context
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 // The DeepInfra API key
@@ -27,6 +28,7 @@ const DEEPINFRA_API_KEY = "3ZJE3fsTlDv1pLKVtfdNQbRPvwhmfHfF";
 const ADMIN_EMAIL = "cyntoremix@gmail.com";
 
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
+  console.log('AuthProvider initializing');
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [deepInfraApiKey, setDeepInfraApiKey] = useState<string>(DEEPINFRA_API_KEY);
@@ -52,7 +54,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     
     setUser({
       id: userData.id,
-      username: userData.username,
+      username: userData.username || userData.email?.split('@')[0] || 'User',
       email: userData.email,
       phoneNumber: userData.phone_number || '',
       isAdmin: isAdminUser
@@ -74,9 +76,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
             .from('profiles')
             .select('*')
             .eq('id', session.user.id)
-            .single();
+            .maybeSingle();
 
-          if (profileError) {
+          if (profileError && profileError.code !== 'PGRST116') {
             console.error('Error fetching profile data:', profileError);
             setIsLoading(false);
             return;
@@ -84,6 +86,13 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
           if (profile) {
             setUserWithAdminStatus(profile);
+          } else if (session.user) {
+            // If profile not found but we have a user, create a minimal user object
+            setUserWithAdminStatus({
+              id: session.user.id,
+              email: session.user.email,
+              is_admin: session.user.email === ADMIN_EMAIL
+            });
           }
         } else {
           console.log('No session found');
@@ -111,9 +120,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
               .from('profiles')
               .select('*')
               .eq('id', session.user.id)
-              .single();
+              .maybeSingle();
 
-            if (profileError) {
+            if (profileError && profileError.code !== 'PGRST116') {
               console.error('Error fetching profile data:', profileError);
               setIsLoading(false);
               return;
@@ -121,6 +130,13 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
             if (profile) {
               setUserWithAdminStatus(profile);
+            } else if (session.user) {
+              // If profile not found but we have a user, create a minimal user object
+              setUserWithAdminStatus({
+                id: session.user.id,
+                email: session.user.email,
+                is_admin: session.user.email === ADMIN_EMAIL
+              });
             }
           } catch (error) {
             console.error('Error in auth state change:', error);
@@ -158,9 +174,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       }
 
       // If this point is reached, auth was successful
-      toast.success('Login successful!');
+      console.log('Authentication successful, checking profile data...');
       
-      // Check if it's the admin email for immediate redirection
+      // Check if it's the admin email for immediate admin status assignment
       const isAdminUser = email === ADMIN_EMAIL;
       
       // Fetch user profile
@@ -169,9 +185,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           .from('profiles')
           .select('*')
           .eq('id', data.user.id)
-          .single();
+          .maybeSingle();
           
-        if (profileError) {
+        if (profileError && profileError.code !== 'PGRST116') {
           console.error('Error fetching profile:', profileError);
           setIsLoading(false);
           throw profileError;
@@ -188,6 +204,17 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           };
           
           setUserWithAdminStatus(userData);
+        } else {
+          // If profile not found, create a minimal user object
+          const userData = {
+            id: data.user.id,
+            email: data.user.email,
+            username: data.user.email?.split('@')[0] || 'User',
+            is_admin: isAdminUser
+          };
+          
+          setUserWithAdminStatus(userData);
+          console.log('Login successful with minimal profile for:', email, 'Admin status:', isAdminUser);
         }
       }
       
@@ -235,12 +262,14 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       }
       
       console.log('Registration successful for:', userData.email);
+      toast.success('Registration successful! You can now log in.');
       return Promise.resolve();
     } catch (error: any) {
       console.error('Registration error:', error);
       toast.error(error.message || 'Registration failed. Please try again.');
-      setIsLoading(false);
       throw error;
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -253,24 +282,29 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       }
       setUser(null);
       console.log('Logout successful');
+      toast.success('Logged out successfully');
     } catch (error) {
       console.error('Logout error:', error);
       toast.error('Failed to log out. Please try again.');
     }
   };
 
+  const contextValue = {
+    user, 
+    isLoading, 
+    login, 
+    register, 
+    logout,
+    isAdmin: user?.isAdmin || false,
+    deepInfraService,
+    setDeepInfraApiKey: (apiKey: string) => setDeepInfraApiKey(apiKey),
+    deepInfraApiKey
+  };
+
+  console.log('AuthProvider rendering with user:', user?.email, 'isAdmin:', user?.isAdmin);
+  
   return (
-    <AuthContext.Provider value={{ 
-      user, 
-      isLoading, 
-      login, 
-      register, 
-      logout,
-      isAdmin: user?.isAdmin || false,
-      deepInfraService,
-      setDeepInfraApiKey: (apiKey: string) => setDeepInfraApiKey(apiKey),
-      deepInfraApiKey
-    }}>
+    <AuthContext.Provider value={contextValue}>
       {children}
     </AuthContext.Provider>
   );
