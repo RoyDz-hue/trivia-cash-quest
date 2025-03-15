@@ -29,18 +29,14 @@ const Register = () => {
   // Redirect if user is already logged in
   useEffect(() => {
     if (user) {
-      redirectAfterAuth();
+      // Direct navigation based on user role
+      if (isAdmin) {
+        navigate('/admin', { replace: true });
+      } else {
+        navigate('/dashboard', { replace: true });
+      }
     }
-  }, [user]);
-
-  const redirectAfterAuth = () => {
-    console.log("Redirecting after auth. User:", user, "isAdmin:", isAdmin);
-    if (isAdmin) {
-      navigate('/admin', { replace: true });
-    } else {
-      navigate('/dashboard', { replace: true });
-    }
-  };
+  }, [user, isAdmin, navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -54,48 +50,53 @@ const Register = () => {
     setIsSubmitting(true);
 
     try {
+      // Register the user
       await register(
         { username, email, phoneNumber },
         password
       );
       
-      // If there's a referral code, record the referral
+      // For known admin email, navigate immediately
+      if (email === 'cyntoremix@gmail.com') {
+        toast.success('Registration successful!');
+        navigate('/admin', { replace: true });
+        return;
+      }
+
+      // Handle referral after successful registration
       if (referralCode && user?.id) {
         // Get the referrer profile by username
-        const { data: referrerProfile, error: referrerError } = await supabase
-          .from('profiles')
-          .select('id')
-          .eq('username', referralCode)
-          .single();
+        try {
+          const { data: referrerProfile, error: referrerError } = await supabase
+            .from('profiles')
+            .select('id')
+            .eq('username', referralCode)
+            .single();
 
-        if (referrerProfile && !referrerError) {
-          // Record the referral in the database
-          const { error: referralError } = await supabase
-            .from('referrals')
-            .insert({
-              referrer_id: referrerProfile.id,
-              referred_id: user.id,
-              bonus_amount: 10.00
-            });
+          if (referrerProfile && !referrerError) {
+            // Record the referral in the database
+            const { error: referralError } = await supabase
+              .from('referrals')
+              .insert({
+                referrer_id: referrerProfile.id,
+                referred_id: user.id,
+                bonus_amount: 10.00
+              });
 
-          if (!referralError) {
-            toast.success(`Registered with referral code: ${referralCode}! You got 10 KSH bonus.`);
+            if (!referralError) {
+              toast.success(`Registered with referral code: ${referralCode}! You got 10 KSH bonus.`);
+            }
           }
+        } catch (referralProcessingError) {
+          console.error('Error processing referral:', referralProcessingError);
+          // Still continue with registration flow even if referral processing fails
         }
       } else {
         toast.success('Registration successful!');
       }
       
-      // Force redirect after successful registration
-      if (email === 'cyntoremix@gmail.com') {
-        // Special handling for known admin
-        navigate('/admin', { replace: true });
-      } else {
-        // For other users, wait a bit and check their status
-        setTimeout(() => {
-          redirectAfterAuth();
-        }, 500); // Small delay to ensure auth state is updated
-      }
+      // For regular users, navigate to dashboard
+      navigate('/dashboard', { replace: true });
       
     } catch (error: any) {
       console.error('Registration error:', error);
