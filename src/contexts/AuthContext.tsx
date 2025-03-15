@@ -65,7 +65,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
               username: profile.username,
               email: profile.email,
               phoneNumber: profile.phone_number || '',
-              isAdmin: profile.is_admin || false
+              isAdmin: profile.is_admin || profile.email === ADMIN_EMAIL || false
             });
           }
         }
@@ -81,30 +81,43 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     // Set up auth state change listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
+        console.log('Auth state changed:', event, session?.user?.email);
+        
         if (event === 'SIGNED_IN' && session) {
-          // Get user profile data
-          const { data: profile, error: profileError } = await supabase
-            .from('profiles')
-            .select('*')
-            .eq('id', session.user.id)
-            .single();
+          try {
+            // Get user profile data
+            const { data: profile, error: profileError } = await supabase
+              .from('profiles')
+              .select('*')
+              .eq('id', session.user.id)
+              .single();
 
-          if (profileError) {
-            console.error('Error fetching profile data:', profileError);
-            return;
-          }
+            if (profileError) {
+              console.error('Error fetching profile data:', profileError);
+              return;
+            }
 
-          if (profile) {
-            setUser({
-              id: profile.id,
-              username: profile.username,
-              email: profile.email,
-              phoneNumber: profile.phone_number || '',
-              isAdmin: profile.is_admin || false
-            });
+            if (profile) {
+              const isAdminUser = profile.is_admin || profile.email === ADMIN_EMAIL || false;
+              console.log('Setting user with admin status:', isAdminUser);
+              
+              setUser({
+                id: profile.id,
+                username: profile.username,
+                email: profile.email,
+                phoneNumber: profile.phone_number || '',
+                isAdmin: isAdminUser
+              });
+            }
+          } catch (error) {
+            console.error('Error in auth state change:', error);
+          } finally {
+            setIsLoading(false);
           }
         } else if (event === 'SIGNED_OUT') {
+          console.log('User signed out');
           setUser(null);
+          setIsLoading(false);
         }
       }
     );
@@ -116,6 +129,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   }, []);
 
   const login = async (email: string, password: string) => {
+    console.log('Attempting login with:', email);
     setIsLoading(true);
     try {
       const { data, error } = await supabase.auth.signInWithPassword({
@@ -127,18 +141,40 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         throw error;
       }
 
-      // Profile data will be fetched by the auth state change listener
+      // Check if it's the admin email
+      const isAdminUser = email === ADMIN_EMAIL;
+      
+      // Get the user profile
+      if (data.user) {
+        const { data: profile, error: profileError } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', data.user.id)
+          .single();
+          
+        if (!profileError && profile) {
+          console.log('Login successful for:', email, 'Admin status:', isAdminUser || profile.is_admin);
+          setUser({
+            id: profile.id,
+            username: profile.username,
+            email: profile.email,
+            phoneNumber: profile.phone_number || '',
+            isAdmin: isAdminUser || profile.is_admin || false
+          });
+        }
+      }
+      
       return Promise.resolve();
     } catch (error: any) {
       console.error('Login error:', error);
       toast.error(error.message || 'Login failed. Please check your credentials.');
-      throw error;
-    } finally {
       setIsLoading(false);
+      throw error;
     }
   };
 
   const register = async (userData: Omit<User, 'id' | 'isAdmin'>, password: string) => {
+    console.log('Attempting registration for:', userData.email);
     setIsLoading(true);
     try {
       const { data, error } = await supabase.auth.signUp({
@@ -156,26 +192,39 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         throw error;
       }
 
-      // Profile data will be created by the database trigger and
-      // fetched by the auth state change listener
+      // If it's the admin email, manually set the admin flag
+      const isAdminUser = userData.email === ADMIN_EMAIL;
+
+      // Set user immediately if possible
+      if (data.user) {
+        setUser({
+          id: data.user.id,
+          username: userData.username,
+          email: userData.email,
+          phoneNumber: userData.phoneNumber,
+          isAdmin: isAdminUser
+        });
+      }
       
+      console.log('Registration successful for:', userData.email);
       return Promise.resolve();
     } catch (error: any) {
       console.error('Registration error:', error);
       toast.error(error.message || 'Registration failed. Please try again.');
-      throw error;
-    } finally {
       setIsLoading(false);
+      throw error;
     }
   };
 
   const logout = async () => {
+    console.log('Attempting logout');
     try {
       const { error } = await supabase.auth.signOut();
       if (error) {
         throw error;
       }
       setUser(null);
+      console.log('Logout successful');
     } catch (error) {
       console.error('Logout error:', error);
       toast.error('Failed to log out. Please try again.');

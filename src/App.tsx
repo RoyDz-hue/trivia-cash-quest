@@ -18,13 +18,22 @@ const queryClient = new QueryClient();
 
 // Protected route component for admin routes
 const AdminRoute = ({ children }: { children: React.ReactNode }) => {
-  const { user, isAdmin } = useAuth();
+  const { user, isAdmin, isLoading } = useAuth();
+
+  console.log('AdminRoute - User:', user?.email, 'isAdmin:', isAdmin, 'isLoading:', isLoading);
+
+  // While checking authentication status, show nothing or a loading indicator
+  if (isLoading) {
+    return <div className="flex h-screen items-center justify-center">Loading...</div>;
+  }
 
   if (!user) {
+    console.log('AdminRoute - No user, redirecting to login');
     return <Navigate to="/login" replace />;
   }
 
   if (!isAdmin) {
+    console.log('AdminRoute - Not admin, redirecting to dashboard');
     return <Navigate to="/dashboard" replace />;
   }
 
@@ -33,9 +42,17 @@ const AdminRoute = ({ children }: { children: React.ReactNode }) => {
 
 // Protected route component for authenticated routes
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
-  const { user } = useAuth();
+  const { user, isLoading } = useAuth();
+
+  console.log('ProtectedRoute - User:', user?.email, 'isLoading:', isLoading);
+  
+  // While checking authentication status, show nothing or a loading indicator
+  if (isLoading) {
+    return <div className="flex h-screen items-center justify-center">Loading...</div>;
+  }
 
   if (!user) {
+    console.log('ProtectedRoute - No user, redirecting to login');
     return <Navigate to="/login" replace />;
   }
 
@@ -43,12 +60,9 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
 };
 
 const AppRoutes = () => {
-  const { user, isAdmin } = useAuth();
+  const { user, isAdmin, isLoading } = useAuth();
 
-  // If user is admin, automatically redirect to admin dashboard from dashboard
-  if (user && isAdmin && window.location.pathname === '/dashboard') {
-    return <Navigate to="/admin" replace />;
-  }
+  console.log('AppRoutes - User:', user?.email, 'isAdmin:', isAdmin, 'isLoading:', isLoading);
 
   return (
     <Routes>
@@ -57,7 +71,8 @@ const AppRoutes = () => {
       <Route path="/register" element={<Register />} />
       <Route path="/dashboard" element={
         <ProtectedRoute>
-          <Dashboard />
+          {isAdmin && <Navigate to="/admin" replace />}
+          {!isAdmin && <Dashboard />}
         </ProtectedRoute>
       } />
       <Route path="/leaderboard" element={

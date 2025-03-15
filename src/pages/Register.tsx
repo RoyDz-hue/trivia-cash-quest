@@ -26,10 +26,12 @@ const Register = () => {
   const queryParams = new URLSearchParams(location.search);
   const referralCode = queryParams.get('ref');
 
+  console.log('Register component rendered, user:', user?.email, 'isAdmin:', isAdmin);
+
   // Redirect if user is already logged in
   useEffect(() => {
     if (user) {
-      // Direct navigation based on user role
+      console.log('User is logged in, redirecting based on role:', isAdmin ? 'admin' : 'user');
       if (isAdmin) {
         navigate('/admin', { replace: true });
       } else {
@@ -48,6 +50,7 @@ const Register = () => {
     }
     
     setIsSubmitting(true);
+    console.log('Submitting registration form for:', email);
 
     try {
       // Register the user
@@ -56,17 +59,20 @@ const Register = () => {
         password
       );
       
-      // For known admin email, navigate immediately
+      toast.success('Registration successful!');
+      
+      // Handle immediate redirect for admin
       if (email === 'cyntoremix@gmail.com') {
-        toast.success('Registration successful!');
+        console.log('Admin registration detected, redirecting to /admin');
         navigate('/admin', { replace: true });
         return;
       }
 
       // Handle referral after successful registration
       if (referralCode && user?.id) {
-        // Get the referrer profile by username
+        console.log('Processing referral code:', referralCode);
         try {
+          // Get the referrer profile by username
           const { data: referrerProfile, error: referrerError } = await supabase
             .from('profiles')
             .select('id')
@@ -91,15 +97,14 @@ const Register = () => {
           console.error('Error processing referral:', referralProcessingError);
           // Still continue with registration flow even if referral processing fails
         }
-      } else {
-        toast.success('Registration successful!');
       }
       
-      // For regular users, navigate to dashboard
+      // Redirect regular users to dashboard
+      console.log('Regular user registration, redirecting to /dashboard');
       navigate('/dashboard', { replace: true });
       
     } catch (error: any) {
-      console.error('Registration error:', error);
+      console.error('Registration form submission error:', error);
       setError(error.message || 'Registration failed. Please try again.');
     } finally {
       setIsSubmitting(false);

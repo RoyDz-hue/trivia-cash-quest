@@ -17,10 +17,12 @@ const Login = () => {
   const { login, isAdmin, user } = useAuth();
   const navigate = useNavigate();
 
+  console.log('Login component rendered, user:', user?.email, 'isAdmin:', isAdmin);
+
   // Redirect if user is already logged in
   useEffect(() => {
     if (user) {
-      // Direct navigation based on user role
+      console.log('User is logged in, redirecting based on role:', isAdmin ? 'admin' : 'user');
       if (isAdmin) {
         navigate('/admin', { replace: true });
       } else {
@@ -31,24 +33,24 @@ const Login = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsSubmitting(true);
     setError(null);
+    setIsSubmitting(true);
 
     try {
+      console.log('Submitting login form for:', email);
       await login(email, password);
       toast.success('Login successful!');
       
-      // For known admin email, navigate immediately
+      // Handle immediate redirect for admin
       if (email === 'cyntoremix@gmail.com') {
+        console.log('Admin login detected, redirecting to /admin');
         navigate('/admin', { replace: true });
-        return;
+      } else {
+        console.log('Regular user login, redirecting to /dashboard');
+        navigate('/dashboard', { replace: true });
       }
-      
-      // For other users, we'll rely on the useEffect to redirect
-      // based on the updated auth state
-      
     } catch (error: any) {
-      console.error('Login error:', error);
+      console.error('Login form submission error:', error);
       setError(error.message || 'Login failed. Please check your credentials.');
     } finally {
       setIsSubmitting(false);
