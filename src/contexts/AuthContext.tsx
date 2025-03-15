@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { User } from '@/types';
 import { createDeepInfraService, DeepInfraService } from '@/services/deepInfraService';
@@ -44,9 +43,11 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     const checkSession = async () => {
       setIsLoading(true);
       try {
+        console.log('Checking session...');
         const { data: { session } } = await supabase.auth.getSession();
 
         if (session) {
+          console.log('Session found:', session.user.email);
           // Get user profile data
           const { data: profile, error: profileError } = await supabase
             .from('profiles')
@@ -56,18 +57,26 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
           if (profileError) {
             console.error('Error fetching profile data:', profileError);
-            throw profileError;
+            setIsLoading(false);
+            return;
           }
 
           if (profile) {
+            // Check if it's the admin
+            const isAdminUser = profile.is_admin || profile.email === ADMIN_EMAIL;
+            console.log('Setting user with admin status:', isAdminUser);
+            
             setUser({
               id: profile.id,
               username: profile.username,
               email: profile.email,
               phoneNumber: profile.phone_number || '',
-              isAdmin: profile.is_admin || profile.email === ADMIN_EMAIL || false
+              isAdmin: isAdminUser
             });
           }
+        } else {
+          console.log('No session found');
+          setUser(null);
         }
       } catch (error) {
         console.error('Session check error:', error);
@@ -84,6 +93,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         console.log('Auth state changed:', event, session?.user?.email);
         
         if (event === 'SIGNED_IN' && session) {
+          setIsLoading(true);
           try {
             // Get user profile data
             const { data: profile, error: profileError } = await supabase
@@ -94,11 +104,12 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
             if (profileError) {
               console.error('Error fetching profile data:', profileError);
+              setIsLoading(false);
               return;
             }
 
             if (profile) {
-              const isAdminUser = profile.is_admin || profile.email === ADMIN_EMAIL || false;
+              const isAdminUser = profile.is_admin || profile.email === ADMIN_EMAIL;
               console.log('Setting user with admin status:', isAdminUser);
               
               setUser({
@@ -130,14 +141,17 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   const login = async (email: string, password: string) => {
     console.log('Attempting login with:', email);
-    setIsLoading(true);
     try {
+      setIsLoading(true);
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password
       });
 
       if (error) {
+        console.error('Login error:', error);
+        toast.error(error.message || 'Login failed. Please check your credentials.');
+        setIsLoading(false);
         throw error;
       }
 
@@ -152,7 +166,13 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           .eq('id', data.user.id)
           .single();
           
-        if (!profileError && profile) {
+        if (profileError) {
+          console.error('Error fetching profile:', profileError);
+          setIsLoading(false);
+          throw profileError;
+        }
+        
+        if (profile) {
           console.log('Login successful for:', email, 'Admin status:', isAdminUser || profile.is_admin);
           setUser({
             id: profile.id,
@@ -168,8 +188,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     } catch (error: any) {
       console.error('Login error:', error);
       toast.error(error.message || 'Login failed. Please check your credentials.');
-      setIsLoading(false);
       throw error;
+    } finally {
+      setIsLoading(false);
     }
   };
 

@@ -14,22 +14,23 @@ const Login = () => {
   const [password, setPassword] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const { login, isAdmin, user } = useAuth();
+  const { login, user, isAdmin, isLoading } = useAuth();
   const navigate = useNavigate();
 
-  console.log('Login component rendered, user:', user?.email, 'isAdmin:', isAdmin);
+  console.log('Login component rendered, user:', user?.email, 'isAdmin:', isAdmin, 'isLoading:', isLoading);
 
-  // Redirect if user is already logged in
+  // Handle redirect if user is already logged in
   useEffect(() => {
-    if (user) {
-      console.log('User is logged in, redirecting based on role:', isAdmin ? 'admin' : 'user');
+    if (user && !isLoading) {
+      console.log('User is logged in, redirecting to:', isAdmin ? '/admin' : '/dashboard');
+      
       if (isAdmin) {
         navigate('/admin', { replace: true });
       } else {
         navigate('/dashboard', { replace: true });
       }
     }
-  }, [user, isAdmin, navigate]);
+  }, [user, isAdmin, isLoading, navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -41,12 +42,13 @@ const Login = () => {
       await login(email, password);
       toast.success('Login successful!');
       
-      // Handle immediate redirect for admin
+      // The useEffect will handle redirection based on user state
+      // This direct navigation is a fallback only
       if (email === 'cyntoremix@gmail.com') {
-        console.log('Admin login detected, redirecting to /admin');
+        console.log('Admin login detected, navigating to /admin');
         navigate('/admin', { replace: true });
       } else {
-        console.log('Regular user login, redirecting to /dashboard');
+        console.log('Regular user login, navigating to /dashboard');
         navigate('/dashboard', { replace: true });
       }
     } catch (error: any) {

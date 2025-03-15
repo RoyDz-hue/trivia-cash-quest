@@ -22,16 +22,18 @@ const AdminRoute = ({ children }: { children: React.ReactNode }) => {
 
   console.log('AdminRoute - User:', user?.email, 'isAdmin:', isAdmin, 'isLoading:', isLoading);
 
-  // While checking authentication status, show nothing or a loading indicator
+  // Show loader while checking auth
   if (isLoading) {
     return <div className="flex h-screen items-center justify-center">Loading...</div>;
   }
 
+  // Not logged in - redirect to login
   if (!user) {
     console.log('AdminRoute - No user, redirecting to login');
     return <Navigate to="/login" replace />;
   }
 
+  // Not admin - redirect to dashboard
   if (!isAdmin) {
     console.log('AdminRoute - Not admin, redirecting to dashboard');
     return <Navigate to="/dashboard" replace />;
@@ -46,11 +48,12 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
 
   console.log('ProtectedRoute - User:', user?.email, 'isLoading:', isLoading);
   
-  // While checking authentication status, show nothing or a loading indicator
+  // Show loader while checking auth
   if (isLoading) {
     return <div className="flex h-screen items-center justify-center">Loading...</div>;
   }
 
+  // Not logged in - redirect to login
   if (!user) {
     console.log('ProtectedRoute - No user, redirecting to login');
     return <Navigate to="/login" replace />;
@@ -71,8 +74,7 @@ const AppRoutes = () => {
       <Route path="/register" element={<Register />} />
       <Route path="/dashboard" element={
         <ProtectedRoute>
-          {isAdmin && <Navigate to="/admin" replace />}
-          {!isAdmin && <Dashboard />}
+          <Dashboard />
         </ProtectedRoute>
       } />
       <Route path="/leaderboard" element={
