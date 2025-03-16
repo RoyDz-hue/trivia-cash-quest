@@ -3,6 +3,37 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { Category } from '@/types';
 
+// Type for the database row format
+type CategoryRow = {
+  id: string;
+  name: string;
+  icon: string;
+  description: string;
+  entry_fee: number;
+  min_players: number;
+  created_at: string;
+  updated_at: string;
+};
+
+// Convert from database format to our application model
+const mapToCategory = (row: CategoryRow): Category => ({
+  id: row.id,
+  name: row.name,
+  icon: row.icon,
+  description: row.description,
+  entryFee: row.entry_fee,
+  minPlayers: row.min_players
+});
+
+// Convert from our application model to database format
+const mapToCategoryRow = (category: Omit<Category, 'id'>): Omit<CategoryRow, 'id' | 'created_at' | 'updated_at'> => ({
+  name: category.name,
+  icon: category.icon,
+  description: category.description,
+  entry_fee: category.entryFee,
+  min_players: category.minPlayers
+});
+
 export const categoriesService = {
   // Get all categories
   async getCategories(): Promise<Category[]> {
@@ -18,7 +49,8 @@ export const categoriesService = {
         return [];
       }
 
-      return data || [];
+      // Map database rows to our Category model
+      return (data as CategoryRow[] || []).map(mapToCategory);
     } catch (error) {
       console.error('Error in getCategories:', error);
       toast.error('An unexpected error occurred');
@@ -41,7 +73,7 @@ export const categoriesService = {
         return null;
       }
 
-      return data;
+      return data ? mapToCategory(data as CategoryRow) : null;
     } catch (error) {
       console.error('Error in getCategoryById:', error);
       toast.error('An unexpected error occurred');
@@ -54,7 +86,7 @@ export const categoriesService = {
     try {
       const { data, error } = await supabase
         .from('categories')
-        .insert(category)
+        .insert(mapToCategoryRow(category))
         .select()
         .single();
 
@@ -65,7 +97,7 @@ export const categoriesService = {
       }
 
       toast.success('Category saved successfully');
-      return data;
+      return mapToCategory(data as CategoryRow);
     } catch (error) {
       console.error('Error in saveCategory:', error);
       toast.error('An unexpected error occurred');
@@ -76,9 +108,17 @@ export const categoriesService = {
   // Update a category
   async updateCategory(id: string, updates: Partial<Category>): Promise<boolean> {
     try {
+      // Convert camelCase props to snake_case for the database
+      const dbUpdates: Partial<CategoryRow> = {};
+      if (updates.name !== undefined) dbUpdates.name = updates.name;
+      if (updates.icon !== undefined) dbUpdates.icon = updates.icon;
+      if (updates.description !== undefined) dbUpdates.description = updates.description;
+      if (updates.entryFee !== undefined) dbUpdates.entry_fee = updates.entryFee;
+      if (updates.minPlayers !== undefined) dbUpdates.min_players = updates.minPlayers;
+
       const { error } = await supabase
         .from('categories')
-        .update(updates)
+        .update(dbUpdates)
         .eq('id', id);
 
       if (error) {

@@ -3,15 +3,51 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { Question, Category } from '@/types';
 import { GeneratedQuestion } from '@/services/deepInfraService';
+import { Json } from '@/integrations/supabase/types';
+
+// Type for the database row format
+type QuestionRow = {
+  id: string;
+  text: string;
+  options: Json;
+  correct_answer: number;
+  time_limit: number;
+  category_id: string;
+  difficulty: string;
+  created_at: string;
+  updated_at: string;
+  categories?: { name: string };
+};
+
+// Convert from database format to our application model
+const mapToQuestion = (row: QuestionRow): Question => ({
+  id: row.id,
+  text: row.text,
+  options: Array.isArray(row.options) ? row.options : [],
+  correctAnswer: row.correct_answer,
+  timeLimit: row.time_limit,
+  categoryId: row.category_id,
+  difficulty: row.difficulty
+});
+
+// Convert from our application model to database format
+const mapToQuestionRow = (question: Omit<Question, 'id'>): Omit<QuestionRow, 'id' | 'created_at' | 'updated_at'> => ({
+  text: question.text,
+  options: question.options,
+  correct_answer: question.correctAnswer,
+  time_limit: question.timeLimit,
+  category_id: question.categoryId,
+  difficulty: question.difficulty
+});
 
 // Convert generated question format to database format
-const formatQuestionForDB = (question: GeneratedQuestion, categoryId: string): Omit<Question, 'id'> => {
+const formatQuestionForDB = (question: GeneratedQuestion, categoryId: string): Omit<QuestionRow, 'id' | 'created_at' | 'updated_at'> => {
   return {
     text: question.question,
     options: question.options,
-    correctAnswer: question.correctAnswer,
-    timeLimit: 30, // Default time limit
-    categoryId: categoryId,
+    correct_answer: question.correctAnswer,
+    time_limit: 30, // Default time limit
+    category_id: categoryId,
     difficulty: 'medium', // Default difficulty
   };
 };
@@ -31,7 +67,7 @@ export const questionsService = {
         return [];
       }
 
-      return data || [];
+      return (data as QuestionRow[] || []).map(mapToQuestion);
     } catch (error) {
       console.error('Error in getQuestions:', error);
       toast.error('An unexpected error occurred');
@@ -53,7 +89,7 @@ export const questionsService = {
         return [];
       }
 
-      return data || [];
+      return (data as QuestionRow[] || []).map(mapToQuestion);
     } catch (error) {
       console.error('Error in getQuestionsByCategory:', error);
       toast.error('An unexpected error occurred');
@@ -66,7 +102,7 @@ export const questionsService = {
     try {
       const { data, error } = await supabase
         .from('questions')
-        .insert(question)
+        .insert(mapToQuestionRow(question))
         .select()
         .single();
 
@@ -77,7 +113,7 @@ export const questionsService = {
       }
 
       toast.success('Question saved successfully');
-      return data;
+      return mapToQuestion(data as QuestionRow);
     } catch (error) {
       console.error('Error in saveQuestion:', error);
       toast.error('An unexpected error occurred');
@@ -113,9 +149,18 @@ export const questionsService = {
   // Update a question
   async updateQuestion(id: string, updates: Partial<Question>): Promise<boolean> {
     try {
+      // Convert camelCase props to snake_case for the database
+      const dbUpdates: Partial<QuestionRow> = {};
+      if (updates.text !== undefined) dbUpdates.text = updates.text;
+      if (updates.options !== undefined) dbUpdates.options = updates.options;
+      if (updates.correctAnswer !== undefined) dbUpdates.correct_answer = updates.correctAnswer;
+      if (updates.timeLimit !== undefined) dbUpdates.time_limit = updates.timeLimit;
+      if (updates.categoryId !== undefined) dbUpdates.category_id = updates.categoryId;
+      if (updates.difficulty !== undefined) dbUpdates.difficulty = updates.difficulty;
+
       const { error } = await supabase
         .from('questions')
-        .update(updates)
+        .update(dbUpdates)
         .eq('id', id);
 
       if (error) {
