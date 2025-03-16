@@ -41,10 +41,10 @@ const Login = () => {
     try {
       console.log('Submitting login form for:', email);
       await login(email, password);
+      toast.success('Login successful! Redirecting...');
       
       // Wait for auth state to update before attempting redirection
       setTimeout(() => {
-        // Check if login was successful by checking if user exists
         if (email === 'cyntoremix@gmail.com' || email.includes('admin')) {
           console.log('Admin login detected, navigating to /admin');
           navigate('/admin', { replace: true });
@@ -52,14 +52,34 @@ const Login = () => {
           console.log('Regular user login, navigating to /dashboard');
           navigate('/dashboard', { replace: true });
         }
-      }, 800); // Increased timeout to ensure state updates
+        
+        // Release isSubmitting state if somehow we're still on the login page
+        setIsSubmitting(false);
+      }, 1000); 
+      
     } catch (error: any) {
       console.error('Login form submission error:', error);
       setError(error.message || 'Login failed. Please check your credentials.');
-    } finally {
       setIsSubmitting(false);
     }
   };
+
+  // If still submitting after 5 seconds, reset the state to prevent permanently disabled buttons
+  useEffect(() => {
+    let timeoutId: number | undefined;
+    
+    if (isSubmitting) {
+      timeoutId = window.setTimeout(() => {
+        setIsSubmitting(false);
+      }, 5000);
+    }
+    
+    return () => {
+      if (timeoutId) {
+        window.clearTimeout(timeoutId);
+      }
+    };
+  }, [isSubmitting]);
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-trivia-background p-4">
@@ -113,7 +133,7 @@ const Login = () => {
             <Button 
               type="submit" 
               className="w-full bg-gradient-to-r from-trivia-primary to-trivia-secondary hover:from-trivia-primary/90 hover:to-trivia-secondary/90"
-              disabled={isSubmitting || isLoading}
+              disabled={isSubmitting}
             >
               {isSubmitting ? (
                 <>
