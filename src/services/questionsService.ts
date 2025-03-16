@@ -23,7 +23,7 @@ type QuestionRow = {
 const mapToQuestion = (row: QuestionRow): Question => ({
   id: row.id,
   text: row.text,
-  // Ensure options is properly cast to string[]
+  // Explicitly convert each option to string to satisfy TypeScript
   options: Array.isArray(row.options) ? row.options.map(opt => String(opt)) : [],
   correctAnswer: row.correct_answer,
   timeLimit: row.time_limit,
