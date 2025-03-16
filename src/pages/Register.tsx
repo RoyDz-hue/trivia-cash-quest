@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { toast } from 'sonner';
-import { AlertCircle } from 'lucide-react';
+import { AlertCircle, Loader2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 
 const Register = () => {
@@ -40,6 +40,23 @@ const Register = () => {
     }
   }, [user, isAdmin, navigate]);
 
+  // If still submitting after 5 seconds, reset the state to prevent permanently disabled buttons
+  useEffect(() => {
+    let timeoutId: number | undefined;
+    
+    if (isSubmitting) {
+      timeoutId = window.setTimeout(() => {
+        setIsSubmitting(false);
+      }, 5000);
+    }
+    
+    return () => {
+      if (timeoutId) {
+        window.clearTimeout(timeoutId);
+      }
+    };
+  }, [isSubmitting]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
@@ -61,52 +78,61 @@ const Register = () => {
       
       toast.success('Registration successful!');
       
-      // Handle immediate redirect for admin
-      if (email === 'cyntoremix@gmail.com') {
-        console.log('Admin registration detected, redirecting to /admin');
-        navigate('/admin', { replace: true });
-        return;
-      }
-
-      // Handle referral after successful registration
-      if (referralCode && user?.id) {
-        console.log('Processing referral code:', referralCode);
-        try {
-          // Get the referrer profile by username
-          const { data: referrerProfile, error: referrerError } = await supabase
-            .from('profiles')
-            .select('id')
-            .eq('username', referralCode)
-            .single();
-
-          if (referrerProfile && !referrerError) {
-            // Record the referral in the database
-            const { error: referralError } = await supabase
-              .from('referrals')
-              .insert({
-                referrer_id: referrerProfile.id,
-                referred_id: user.id,
-                bonus_amount: 10.00
-              });
-
-            if (!referralError) {
-              toast.success(`Registered with referral code: ${referralCode}! You got 10 KSH bonus.`);
-            }
-          }
-        } catch (referralProcessingError) {
-          console.error('Error processing referral:', referralProcessingError);
-          // Still continue with registration flow even if referral processing fails
+      // Handle redirection with a delay to ensure auth state updates
+      setTimeout(() => {
+        // Handle immediate redirect for admin
+        if (email === 'cyntoremix@gmail.com') {
+          console.log('Admin registration detected, redirecting to /admin');
+          navigate('/admin', { replace: true });
+          return;
         }
-      }
-      
-      // Redirect regular users to dashboard
-      console.log('Regular user registration, redirecting to /dashboard');
-      navigate('/dashboard', { replace: true });
+
+        // Handle referral after successful registration
+        if (referralCode && user?.id) {
+          console.log('Processing referral code:', referralCode);
+          try {
+            // Get the referrer profile by username
+            const { data: referrerProfile, error: referrerError } = supabase
+              .from('profiles')
+              .select('id')
+              .eq('username', referralCode)
+              .single();
+
+            // Check if promises are resolved
+            Promise.resolve(referrerProfile).then(profile => {
+              if (profile && !referrerError) {
+                // Record the referral in the database
+                supabase
+                  .from('referrals')
+                  .insert({
+                    referrer_id: profile.id,
+                    referred_id: user.id,
+                    bonus_amount: 10.00
+                  })
+                  .then(({ error: referralError }) => {
+                    if (!referralError) {
+                      toast.success(`Registered with referral code: ${referralCode}! You got 10 KSH bonus.`);
+                    }
+                  });
+              }
+            });
+          } catch (referralProcessingError) {
+            console.error('Error processing referral:', referralProcessingError);
+            // Still continue with registration flow even if referral processing fails
+          }
+        }
+        
+        // Redirect regular users to dashboard
+        console.log('Regular user registration, redirecting to /dashboard');
+        navigate('/dashboard', { replace: true });
+
+        // Finally release the submitting state if we're still on the page
+        setIsSubmitting(false);
+      }, 1000);
       
     } catch (error: any) {
       console.error('Registration form submission error:', error);
       setError(error.message || 'Registration failed. Please try again.');
-    } finally {
       setIsSubmitting(false);
     }
   };
@@ -146,6 +172,7 @@ const Register = () => {
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
                 required
+                disabled={isSubmitting}
               />
             </div>
             <div className="space-y-2">
@@ -157,6 +184,7 @@ const Register = () => {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
+                disabled={isSubmitting}
               />
             </div>
             <div className="space-y-2">
@@ -167,6 +195,7 @@ const Register = () => {
                 value={phoneNumber}
                 onChange={(e) => setPhoneNumber(e.target.value)}
                 required
+                disabled={isSubmitting}
               />
             </div>
             <div className="space-y-2">
@@ -178,6 +207,7 @@ const Register = () => {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
+                disabled={isSubmitting}
               />
             </div>
             <div className="space-y-2">
@@ -189,6 +219,7 @@ const Register = () => {
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 required
+                disabled={isSubmitting}
               />
             </div>
             <Button 
@@ -196,7 +227,12 @@ const Register = () => {
               className="w-full bg-gradient-to-r from-trivia-primary to-trivia-secondary hover:from-trivia-primary/90 hover:to-trivia-secondary/90"
               disabled={isSubmitting}
             >
-              {isSubmitting ? 'Registering...' : 'Register'}
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Registering...
+                </>
+              ) : 'Register'}
             </Button>
           </form>
         </CardContent>
