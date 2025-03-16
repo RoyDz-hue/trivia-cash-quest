@@ -23,7 +23,8 @@ type QuestionRow = {
 const mapToQuestion = (row: QuestionRow): Question => ({
   id: row.id,
   text: row.text,
-  options: Array.isArray(row.options) ? row.options : [],
+  // Ensure options is properly cast to string[]
+  options: Array.isArray(row.options) ? row.options.map(opt => String(opt)) : [],
   correctAnswer: row.correct_answer,
   timeLimit: row.time_limit,
   categoryId: row.category_id,
