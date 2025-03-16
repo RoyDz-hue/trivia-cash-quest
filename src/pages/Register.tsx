@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
@@ -91,31 +90,29 @@ const Register = () => {
         if (referralCode && user?.id) {
           console.log('Processing referral code:', referralCode);
           try {
-            // Get the referrer profile by username
-            const { data: referrerProfile, error: referrerError } = supabase
+            // Get the referrer profile by username - this needs to be fixed
+            supabase
               .from('profiles')
               .select('id')
               .eq('username', referralCode)
-              .single();
-
-            // Check if promises are resolved
-            Promise.resolve(referrerProfile).then(profile => {
-              if (profile && !referrerError) {
-                // Record the referral in the database
-                supabase
-                  .from('referrals')
-                  .insert({
-                    referrer_id: profile.id,
-                    referred_id: user.id,
-                    bonus_amount: 10.00
-                  })
-                  .then(({ error: referralError }) => {
-                    if (!referralError) {
-                      toast.success(`Registered with referral code: ${referralCode}! You got 10 KSH bonus.`);
-                    }
-                  });
-              }
-            });
+              .single()
+              .then(({ data: referrerProfile, error: referrerError }) => {
+                if (referrerProfile && !referrerError) {
+                  // Record the referral in the database
+                  supabase
+                    .from('referrals')
+                    .insert({
+                      referrer_id: referrerProfile.id,
+                      referred_id: user.id,
+                      bonus_amount: 10.00
+                    })
+                    .then(({ error: referralError }) => {
+                      if (!referralError) {
+                        toast.success(`Registered with referral code: ${referralCode}! You got 10 KSH bonus.`);
+                      }
+                    });
+                }
+              });
           } catch (referralProcessingError) {
             console.error('Error processing referral:', referralProcessingError);
             // Still continue with registration flow even if referral processing fails
