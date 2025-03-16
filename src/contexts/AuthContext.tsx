@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { User } from '@/types';
 import { createDeepInfraService, DeepInfraService } from '@/services/deepInfraService';
@@ -48,7 +47,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       return;
     }
     
-    const isAdminUser = userData.is_admin || userData.email === ADMIN_EMAIL;
+    // Fix: Check both conditions for admin status more reliably
+    const isAdminUser = Boolean(userData.is_admin) || userData.email === ADMIN_EMAIL;
     console.log('Setting user with profile:', userData);
     console.log('Admin status:', isAdminUser);
     
@@ -71,28 +71,46 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
         if (session) {
           console.log('Session found:', session.user.email);
-          // Get user profile data
-          const { data: profile, error: profileError } = await supabase
-            .from('profiles')
-            .select('*')
-            .eq('id', session.user.id)
-            .maybeSingle();
+          
+          // FIX: Handle the case where profile fetch fails without breaking authentication
+          try {
+            // Get user profile data
+            const { data: profile, error: profileError } = await supabase
+              .from('profiles')
+              .select('*')
+              .eq('id', session.user.id)
+              .maybeSingle();
 
-          if (profileError && profileError.code !== 'PGRST116') {
-            console.error('Error fetching profile data:', profileError);
-            setIsLoading(false);
-            return;
-          }
-
-          if (profile) {
-            setUserWithAdminStatus(profile);
-          } else if (session.user) {
-            // If profile not found but we have a user, create a minimal user object
-            setUserWithAdminStatus({
-              id: session.user.id,
-              email: session.user.email,
-              is_admin: session.user.email === ADMIN_EMAIL
-            });
+            if (profileError) {
+              console.error('Error fetching profile data:', profileError);
+              // Even if profile fetch fails, still set the user with basic data
+              if (session.user) {
+                setUserWithAdminStatus({
+                  id: session.user.id,
+                  email: session.user.email,
+                  is_admin: session.user.email === ADMIN_EMAIL
+                });
+              }
+            } else if (profile) {
+              setUserWithAdminStatus(profile);
+            } else if (session.user) {
+              // If profile not found but we have a user, create a minimal user object
+              setUserWithAdminStatus({
+                id: session.user.id,
+                email: session.user.email,
+                is_admin: session.user.email === ADMIN_EMAIL
+              });
+            }
+          } catch (profileError) {
+            console.error('Profile fetch error:', profileError);
+            // Fallback: Create user with basic session data
+            if (session.user) {
+              setUserWithAdminStatus({
+                id: session.user.id,
+                email: session.user.email,
+                is_admin: session.user.email === ADMIN_EMAIL
+              });
+            }
           }
         } else {
           console.log('No session found');
@@ -100,6 +118,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         }
       } catch (error) {
         console.error('Session check error:', error);
+        setUser(null);
       } finally {
         setIsLoading(false);
       }
@@ -115,31 +134,56 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         if (event === 'SIGNED_IN' && session) {
           setIsLoading(true);
           try {
-            // Get user profile data
-            const { data: profile, error: profileError } = await supabase
-              .from('profiles')
-              .select('*')
-              .eq('id', session.user.id)
-              .maybeSingle();
+            // FIX: Handle the case where profile fetch fails without breaking authentication
+            try {
+              // Get user profile data
+              const { data: profile, error: profileError } = await supabase
+                .from('profiles')
+                .select('*')
+                .eq('id', session.user.id)
+                .maybeSingle();
 
-            if (profileError && profileError.code !== 'PGRST116') {
-              console.error('Error fetching profile data:', profileError);
-              setIsLoading(false);
-              return;
+              if (profileError) {
+                console.error('Error fetching profile data:', profileError);
+                // Even if profile fetch fails, still set the user with basic data
+                if (session.user) {
+                  setUserWithAdminStatus({
+                    id: session.user.id,
+                    email: session.user.email,
+                    is_admin: session.user.email === ADMIN_EMAIL
+                  });
+                }
+              } else if (profile) {
+                setUserWithAdminStatus(profile);
+              } else if (session.user) {
+                // If profile not found but we have a user, create a minimal user object
+                setUserWithAdminStatus({
+                  id: session.user.id,
+                  email: session.user.email,
+                  is_admin: session.user.email === ADMIN_EMAIL
+                });
+              }
+            } catch (profileError) {
+              console.error('Profile fetch error in auth change:', profileError);
+              // Fallback: Create user with basic session data
+              if (session.user) {
+                setUserWithAdminStatus({
+                  id: session.user.id,
+                  email: session.user.email,
+                  is_admin: session.user.email === ADMIN_EMAIL
+                });
+              }
             }
-
-            if (profile) {
-              setUserWithAdminStatus(profile);
-            } else if (session.user) {
-              // If profile not found but we have a user, create a minimal user object
+          } catch (error) {
+            console.error('Error in auth state change:', error);
+            // Still set the user with basic data
+            if (session.user) {
               setUserWithAdminStatus({
                 id: session.user.id,
                 email: session.user.email,
                 is_admin: session.user.email === ADMIN_EMAIL
               });
             }
-          } catch (error) {
-            console.error('Error in auth state change:', error);
           } finally {
             setIsLoading(false);
           }
@@ -169,7 +213,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       if (error) {
         console.error('Login error:', error);
         toast.error(error.message || 'Login failed. Please check your credentials.');
-        setIsLoading(false);
         throw error;
       }
 
@@ -179,45 +222,64 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       // Check if it's the admin email for immediate admin status assignment
       const isAdminUser = email === ADMIN_EMAIL;
       
-      // Fetch user profile
-      if (data.user) {
-        const { data: profile, error: profileError } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', data.user.id)
-          .maybeSingle();
-          
-        if (profileError && profileError.code !== 'PGRST116') {
-          console.error('Error fetching profile:', profileError);
-          setIsLoading(false);
-          throw profileError;
+      // FIX: Handle the case where profile fetch fails without breaking authentication
+      try {
+        // Fetch user profile
+        if (data.user) {
+          const { data: profile, error: profileError } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', data.user.id)
+            .maybeSingle();
+            
+          if (profileError) {
+            console.error('Error fetching profile:', profileError);
+            // Still set user with basic data
+            const userData = {
+              id: data.user.id,
+              email: data.user.email,
+              username: data.user.email?.split('@')[0] || 'User',
+              is_admin: isAdminUser
+            };
+            
+            setUserWithAdminStatus(userData);
+          } else if (profile) {
+            console.log('Login successful for:', email, 'Admin status:', isAdminUser || profile.is_admin);
+            const userData = {
+              id: profile.id,
+              username: profile.username,
+              email: profile.email,
+              phone_number: profile.phone_number || '',
+              is_admin: isAdminUser || profile.is_admin || false
+            };
+            
+            setUserWithAdminStatus(userData);
+          } else {
+            // If profile not found, create a minimal user object
+            const userData = {
+              id: data.user.id,
+              email: data.user.email,
+              username: data.user.email?.split('@')[0] || 'User',
+              is_admin: isAdminUser
+            };
+            
+            setUserWithAdminStatus(userData);
+            console.log('Login successful with minimal profile for:', email, 'Admin status:', isAdminUser);
+          }
         }
-        
-        if (profile) {
-          console.log('Login successful for:', email, 'Admin status:', isAdminUser || profile.is_admin);
-          const userData = {
-            id: profile.id,
-            username: profile.username,
-            email: profile.email,
-            phone_number: profile.phone_number || '',
-            is_admin: isAdminUser || profile.is_admin || false
-          };
-          
-          setUserWithAdminStatus(userData);
-        } else {
-          // If profile not found, create a minimal user object
-          const userData = {
+      } catch (profileError) {
+        console.error('Profile error during login:', profileError);
+        // Fallback: Set user with basic auth data
+        if (data.user) {
+          setUserWithAdminStatus({
             id: data.user.id,
             email: data.user.email,
-            username: data.user.email?.split('@')[0] || 'User',
             is_admin: isAdminUser
-          };
-          
-          setUserWithAdminStatus(userData);
-          console.log('Login successful with minimal profile for:', email, 'Admin status:', isAdminUser);
+          });
         }
       }
       
+      toast.success('Login successful! Redirecting...');
       return Promise.resolve();
     } catch (error: any) {
       console.error('Login error:', error);

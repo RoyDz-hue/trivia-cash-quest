@@ -14,7 +14,15 @@ import Profile from "./pages/Profile";
 import Admin from "./pages/Admin";
 import NotFound from "./pages/NotFound";
 
-const queryClient = new QueryClient();
+// Create a new QueryClient instance
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      retry: 1,
+      refetchOnWindowFocus: false,
+    },
+  },
+});
 
 // Protected route component for admin routes
 const AdminRoute = ({ children }: { children: React.ReactNode }) => {
@@ -64,6 +72,7 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   return <>{children}</>;
 };
 
+// The main App component that sets up the app structure
 const App = () => {
   console.log('App component rendering');
   

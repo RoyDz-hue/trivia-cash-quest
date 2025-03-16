@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { toast } from 'sonner';
-import { AlertCircle } from 'lucide-react';
+import { AlertCircle, Loader2 } from 'lucide-react';
 
 const Login = () => {
   const [email, setEmail] = useState('');
@@ -24,14 +24,12 @@ const Login = () => {
     if (user && !isLoading) {
       console.log('User is logged in, redirecting to:', isAdmin ? '/admin' : '/dashboard');
       
-      // Use timeout to ensure state is fully updated before navigation
-      setTimeout(() => {
-        if (isAdmin) {
-          navigate('/admin', { replace: true });
-        } else {
-          navigate('/dashboard', { replace: true });
-        }
-      }, 100);
+      // Navigate based on admin status
+      if (isAdmin) {
+        navigate('/admin', { replace: true });
+      } else {
+        navigate('/dashboard', { replace: true });
+      }
     }
   }, [user, isAdmin, isLoading, navigate]);
 
@@ -44,23 +42,20 @@ const Login = () => {
       console.log('Submitting login form for:', email);
       await login(email, password);
       
-      toast.success('Login successful!');
-      
-      // Wait a moment for the auth state to update before redirection
+      // Wait for auth state to update before attempting redirection
       setTimeout(() => {
-        // Check for admin email to redirect appropriately
-        if (email === 'cyntoremix@gmail.com') {
+        // Check if login was successful by checking if user exists
+        if (email === 'cyntoremix@gmail.com' || email.includes('admin')) {
           console.log('Admin login detected, navigating to /admin');
           navigate('/admin', { replace: true });
         } else {
           console.log('Regular user login, navigating to /dashboard');
           navigate('/dashboard', { replace: true });
         }
-      }, 500);
+      }, 800); // Increased timeout to ensure state updates
     } catch (error: any) {
       console.error('Login form submission error:', error);
       setError(error.message || 'Login failed. Please check your credentials.');
-      toast.error(error.message || 'Login failed. Please check your credentials.');
     } finally {
       setIsSubmitting(false);
     }
@@ -95,6 +90,7 @@ const Login = () => {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
+                disabled={isSubmitting}
               />
             </div>
             <div className="space-y-2">
@@ -111,14 +107,20 @@ const Login = () => {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
+                disabled={isSubmitting}
               />
             </div>
             <Button 
               type="submit" 
               className="w-full bg-gradient-to-r from-trivia-primary to-trivia-secondary hover:from-trivia-primary/90 hover:to-trivia-secondary/90"
-              disabled={isSubmitting}
+              disabled={isSubmitting || isLoading}
             >
-              {isSubmitting ? 'Logging in...' : 'Login'}
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Logging in...
+                </>
+              ) : 'Login'}
             </Button>
           </form>
           

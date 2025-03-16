@@ -337,6 +337,199 @@ export type Database = {
           },
         ]
       }
+      trivia_oy5xf_answers: {
+        Row: {
+          answered_at: string
+          id: number
+          is_correct: boolean
+          points_earned: number
+          question_id: number | null
+          selected_answer: number
+          session_id: number | null
+          time_taken: number
+          user_email: string
+        }
+        Insert: {
+          answered_at?: string
+          id?: number
+          is_correct: boolean
+          points_earned: number
+          question_id?: number | null
+          selected_answer: number
+          session_id?: number | null
+          time_taken: number
+          user_email: string
+        }
+        Update: {
+          answered_at?: string
+          id?: number
+          is_correct?: boolean
+          points_earned?: number
+          question_id?: number | null
+          selected_answer?: number
+          session_id?: number | null
+          time_taken?: number
+          user_email?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "trivia_oy5xf_answers_question_id_fkey"
+            columns: ["question_id"]
+            isOneToOne: false
+            referencedRelation: "trivia_oy5xf_questions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "trivia_oy5xf_answers_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "trivia_oy5xf_game_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      trivia_oy5xf_categories: {
+        Row: {
+          created_at: string
+          created_by: string
+          description: string | null
+          id: number
+          name: string
+        }
+        Insert: {
+          created_at?: string
+          created_by: string
+          description?: string | null
+          id?: number
+          name: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          description?: string | null
+          id?: number
+          name?: string
+        }
+        Relationships: []
+      }
+      trivia_oy5xf_game_sessions: {
+        Row: {
+          category_id: number | null
+          completed_at: string | null
+          correct_answers: number | null
+          id: number
+          questions_answered: number | null
+          started_at: string
+          status: string | null
+          total_score: number | null
+          user_email: string
+        }
+        Insert: {
+          category_id?: number | null
+          completed_at?: string | null
+          correct_answers?: number | null
+          id?: number
+          questions_answered?: number | null
+          started_at?: string
+          status?: string | null
+          total_score?: number | null
+          user_email: string
+        }
+        Update: {
+          category_id?: number | null
+          completed_at?: string | null
+          correct_answers?: number | null
+          id?: number
+          questions_answered?: number | null
+          started_at?: string
+          status?: string | null
+          total_score?: number | null
+          user_email?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "trivia_oy5xf_game_sessions_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "trivia_oy5xf_categories"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      trivia_oy5xf_questions: {
+        Row: {
+          category_id: number | null
+          correct_answer: number
+          created_at: string
+          created_by: string
+          id: number
+          options: string[]
+          points: number | null
+          question: string
+          time_limit: number | null
+        }
+        Insert: {
+          category_id?: number | null
+          correct_answer: number
+          created_at?: string
+          created_by: string
+          id?: number
+          options: string[]
+          points?: number | null
+          question: string
+          time_limit?: number | null
+        }
+        Update: {
+          category_id?: number | null
+          correct_answer?: number
+          created_at?: string
+          created_by?: string
+          id?: number
+          options?: string[]
+          points?: number | null
+          question?: string
+          time_limit?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "trivia_oy5xf_questions_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "trivia_oy5xf_categories"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      users_trivia_oy5xf_profiles: {
+        Row: {
+          created_at: string
+          credits: number | null
+          display_name: string | null
+          id: string
+          is_admin: boolean | null
+          updated_at: string
+          user_email: string
+        }
+        Insert: {
+          created_at?: string
+          credits?: number | null
+          display_name?: string | null
+          id: string
+          is_admin?: boolean | null
+          updated_at?: string
+          user_email: string
+        }
+        Update: {
+          created_at?: string
+          credits?: number | null
+          display_name?: string | null
+          id?: string
+          is_admin?: boolean | null
+          updated_at?: string
+          user_email?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
