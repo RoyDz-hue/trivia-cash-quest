@@ -19,19 +19,15 @@ const Login = () => {
 
   console.log('Login component rendered, user:', user?.email, 'isAdmin:', isAdmin, 'isLoading:', isLoading);
 
-  // Enhanced redirect logic with explicit priority handling
-  const handleRedirection = useCallback(() => {
+  // Simple redirect logic that runs once when auth state is determined
+  useEffect(() => {
+    // Only redirect if we have a user and auth is not in loading state
     if (user && !isLoading) {
       const destination = isAdmin ? '/admin' : '/dashboard';
-      console.log(`Redirecting authenticated user to: ${destination}`);
+      console.log(`Auth state determined, redirecting to: ${destination}`);
       navigate(destination, { replace: true });
     }
   }, [user, isAdmin, isLoading, navigate]);
-
-  // Handle redirect if user is already logged in
-  useEffect(() => {
-    handleRedirection();
-  }, [handleRedirection]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -39,26 +35,22 @@ const Login = () => {
     setIsSubmitting(true);
 
     try {
-      console.log('Submitting login form for:', email);
+      console.log('Attempting login for:', email);
       await login(email, password);
-      toast.success('Login successful! Redirecting...');
+      toast.success('Login successful!');
       
-      // Force a redirection check immediately after successful login
-      // This helps when the auth state updates quickly
-      if (email === 'cyntoremix@gmail.com') {
-        console.log('Admin login detected, applying direct navigation');
-        navigate('/admin', { replace: true });
-      }
+      // No need for manual redirection here - the useEffect will handle it
+      // when the auth state updates
       
-      setIsSubmitting(false);
     } catch (error: any) {
-      console.error('Login form submission error:', error);
+      console.error('Login error:', error);
       setError(error.message || 'Login failed. Please check your credentials.');
+    } finally {
       setIsSubmitting(false);
     }
   };
 
-  // If still submitting after 5 seconds, reset the state to prevent permanently disabled buttons
+  // Reset submission state after timeout to prevent UI from being stuck
   useEffect(() => {
     let timeoutId: number | undefined;
     
