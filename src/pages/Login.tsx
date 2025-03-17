@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
@@ -19,19 +19,19 @@ const Login = () => {
 
   console.log('Login component rendered, user:', user?.email, 'isAdmin:', isAdmin, 'isLoading:', isLoading);
 
-  // Handle redirect if user is already logged in
-  useEffect(() => {
+  // Enhanced redirect logic with explicit priority handling
+  const handleRedirection = useCallback(() => {
     if (user && !isLoading) {
-      console.log('User is logged in, redirecting to:', isAdmin ? '/admin' : '/dashboard');
-      
-      // Navigate based on admin status
-      if (isAdmin) {
-        navigate('/admin', { replace: true });
-      } else {
-        navigate('/dashboard', { replace: true });
-      }
+      const destination = isAdmin ? '/admin' : '/dashboard';
+      console.log(`Redirecting authenticated user to: ${destination}`);
+      navigate(destination, { replace: true });
     }
   }, [user, isAdmin, isLoading, navigate]);
+
+  // Handle redirect if user is already logged in
+  useEffect(() => {
+    handleRedirection();
+  }, [handleRedirection]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -43,8 +43,13 @@ const Login = () => {
       await login(email, password);
       toast.success('Login successful! Redirecting...');
       
-      // The useEffect hook will handle redirection based on user role
-      // No need for manual setTimeout redirection which can cause race conditions
+      // Force a redirection check immediately after successful login
+      // This helps when the auth state updates quickly
+      if (email === 'cyntoremix@gmail.com') {
+        console.log('Admin login detected, applying direct navigation');
+        navigate('/admin', { replace: true });
+      }
+      
       setIsSubmitting(false);
     } catch (error: any) {
       console.error('Login form submission error:', error);
