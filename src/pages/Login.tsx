@@ -43,8 +43,11 @@ const Login = () => {
       await login(email, password);
       toast.success('Login successful! Redirecting...');
       
-      // Instead of using setTimeout, let the useEffect handle the redirection
-      // This avoids race conditions between the auth state and redirection logic
+      // For admin accounts, manually handle redirection since the useEffect might miss it during quick transitions
+      if (email === 'cyntoremix@gmail.com' || email.includes('admin')) {
+        console.log('Admin login detected, navigating to /admin');
+        setTimeout(() => navigate('/admin', { replace: true }), 500);
+      }
       setIsSubmitting(false);
     } catch (error: any) {
       console.error('Login form submission error:', error);
